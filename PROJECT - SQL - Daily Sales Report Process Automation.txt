@@ -1,0 +1,3397 @@
+use Management_Information
+--This is the variable used to set the reporting month - MMM YYYY
+DECLARE @MONTH NVARCHAR(MAX)
+SET @MONTH = 'JUL 2019'
+
+--This is the variable used to set the reporting month - yyyy-mm-dd
+DECLARE @MONTH2 DATE
+SET @MONTH2 = '2019-07-01'
+
+DECLARE @NEGATIVE INT
+SET @NEGATIVE = -80000
+
+--This is the variable used to adjust the large deal threshold
+DECLARE @LARGEDEAL DECIMAL(15,2)
+SET @LARGEDEAL = 100000.00
+
+--This is the variable used to check for negative values in order book.
+DECLARE @NEGATIVE2 DECIMAL(15,2)
+SET @NEGATIVE2 = 0.00
+
+--This is the variable used to adjust for TB
+DECLARE @TB DECIMAL(15,2)
+SET @TB = 0
+
+
+
+
+
+
+
+--This is the variable used to adjust for Service orderbook the higher figue of actual or budget is to be used
+DECLARE @SERVICE DECIMAL(15,2)
+SET @SERVICE = 6491000.00
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#CRMBUSINESSUNITS - Creates an unpivoted version of the Budget table
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT *  into #CRMBUSINESSUNITS FROM [lup].[CRM_BUSINESS_UNITS]
+WHERE [BUSINESS UNIT] not in (
+							'BGB',
+							'BGB - Document Services - Public - Public - GSA',
+							'BGB - Document Services - Private - Customer & Channel Marketing',
+							'BGB - Document Services - Private - Graphic Arts - Technical Implementation',
+							'BGB - Document Services - Private - Solution Support Services',
+							'BGB - Document Services - Private - Solution Support Services - Business Generation',
+							'BGB - Document Services - Private - Solution Support Services - Customer Operations',
+							'BGB - Document Services - Private - Solution Support Services - Customer Operations - 1',
+							'BGB - Document Services - Private - Solution Support Services - Customer Operations - 2',
+							'BGB - Document Services - Private - Solution Support Services - Customer Operations - 3',
+							'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery',
+							'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - East',
+							'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - North',
+							'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - South',
+							'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - West',
+							'BGB - Document Services - Private - Solution Support Services - Product Management',
+							'BGB - Document Services - Private - Solution Support Services - Solutions Support',
+							'BGB - Document Services - Public - PMO',
+							'BGB - Document Services - Public - PMO - Project Management',
+							'BGB - Document Services - Public - PMO - Project Management - 1',
+							'BGB - Document Services - Public - PMO - Project Management - 2',
+							'BGB - Document Services - Public - PMO - Project Support',
+							'BGB - Document Services - Public - PMO - Project Support - 1',
+							'BGB - Document Services - Public - PMO - Project Support - 2',
+							'BGB - Document Services - Public - Scotland - Bids & Tenders',
+							'BGB - Document Services - Public - Solutions Support Services',
+							'BGB - Document Services - Public - Solutions Support Services - Bids & Tenders',
+							'BGB - Document Services - Public - Solutions Support Services - OPS Print & Audit',
+							'BGB - Document Services - Public - Solutions Support Services - PPD National Channel',
+							'BGB - Document Services - Public - Solutions Support Services - Pre Sales',
+							'BGB - Document Services - Public - Solutions Support Services - Pre Sales - Bids & Tenders',
+							'BGB - Document Services - Public - Solutions Support Services - Pre Sales - Public',
+							'BGB - Disabled Users'
+							)
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#BUDGETS - Creates an unpivoted version of the Budget table
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+Select
+	[BUSINESS UNIT]
+	,[SALES DISTRICT ]
+	,[SALES TEAM]
+	,[SALES AREA]
+	,[SALES OFFICE]
+	,Budget
+	,Amount
+into #BUDGETS
+FRom
+(select 
+	[BUSINESS UNIT]
+	,[SALES DISTRICT ]
+	,[SALES TEAM]
+	,[SALES AREA]
+	,[SALES OFFICE]
+	,[Budget A3 £000's] as A3
+	,[Budget A4 £000's] as A4
+	,[Budget PP £000's] as PP
+	,[Budget IP £000's] as [IP]
+	,[Budget Sol £000's] as SOL
+	,[Budget Rental £000's]	as Rental
+	from dsr.BUDGETS
+	WHERE [BUSINESS UNIT] not in (
+									'BGB',
+									'BGB - Document Services - Public - Public - GSA',
+									'BGB - Document Services - Private - Customer & Channel Marketing',
+									'BGB - Document Services - Private - Graphic Arts - Technical Implementation',
+									'BGB - Document Services - Private - Solution Support Services',
+									'BGB - Document Services - Private - Solution Support Services - Business Generation',
+									'BGB - Document Services - Private - Solution Support Services - Customer Operations',
+									'BGB - Document Services - Private - Solution Support Services - Customer Operations - 1',
+									'BGB - Document Services - Private - Solution Support Services - Customer Operations - 2',
+									'BGB - Document Services - Private - Solution Support Services - Customer Operations - 3',
+									'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery',
+									'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - East',
+									'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - North',
+									'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - South',
+									'BGB - Document Services - Private - Solution Support Services - National Solutions Delivery - West',
+									'BGB - Document Services - Private - Solution Support Services - Product Management',
+									'BGB - Document Services - Private - Solution Support Services - Solutions Support',
+									'BGB - Document Services - Public - PMO',
+									'BGB - Document Services - Public - PMO - Project Management',
+									'BGB - Document Services - Public - PMO - Project Management - 1',
+									'BGB - Document Services - Public - PMO - Project Management - 2',
+									'BGB - Document Services - Public - PMO - Project Support',
+									'BGB - Document Services - Public - PMO - Project Support - 1',
+									'BGB - Document Services - Public - PMO - Project Support - 2',
+									'BGB - Document Services - Public - Scotland - Bids & Tenders',
+									'BGB - Document Services - Public - Solutions Support Services',
+									'BGB - Document Services - Public - Solutions Support Services - Bids & Tenders',
+									'BGB - Document Services - Public - Solutions Support Services - OPS Print & Audit',
+									'BGB - Document Services - Public - Solutions Support Services - PPD National Channel',
+									'BGB - Document Services - Public - Solutions Support Services - Pre Sales',
+									'BGB - Document Services - Public - Solutions Support Services - Pre Sales - Bids & Tenders',
+									'BGB - Document Services - Public - Solutions Support Services - Pre Sales - Public',
+									'BGB - Disabled Users')
+	) kd 
+UNPIVOT (Amount for Budget IN (A3, A4, PP, [IP], SOL,Rental)) dk
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#REBATES - Creates an unpivoted version of the Rebate table
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT 
+	[Type],
+	[Sales District],
+	[Customer Number],
+	[Customer Name],
+	F5,
+	REPLACE(Rebate,'#','.') as Rebate,
+	Amount
+	INTO #REBATES
+	From
+		(SELECT
+			[Type],
+			[Sales District],
+			[Customer Number],
+			[Customer Name],
+			F5,
+			[Rebate %], Machines, Accessories, Consumables, [Spare Parts], [Trad# Accessories], [Trad# Spare Parts], [Rental And Service], Documentations
+			FROM [dsr].[DEALER_REBATE]) kd
+UNPIVOT (Amount for Rebate IN ([Rebate %], Machines, Accessories, Consumables, [Spare Parts], [Trad# Accessories], [Trad# Spare Parts], [Rental And Service], Documentations)) as dk
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#ORDERBOOK - Creates and orderbook file with a sales document column that doesnt contain a text string
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT * into #ORDERBOOK from base.COMMISSIONS_OB  WHERe [Sales Document] not like '#' and [Sales Document] not like 'Overall Result' 
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#CARRYOVER - creates a carry over file with a 2nd order.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+select 
+	mco.[Sales document]
+	,[Sales doc]
+	,dco.[2nd order]
+	,Amount
+	,[Carry over]
+	,CASE 
+		WHEN DCO.[2ND ORDER] ='#' THEN [SALES DOC]
+		WHEN DCO.[2ND ORDER] IS NULL THEN [SALES DOC]
+			ELSE DCO.[2ND ORDER]
+				END AS [SALES DOC TO USE]
+into #CARRYOVER
+from dsr.monthly_carry_over mco
+left JOIN (select [Sales document], [2nd order] from dsr.Daily_Carry_Over group by [Sales document], [2nd order]) dco
+	on mco.[sales Doc] = dco.[Sales Document]
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_FORMATTED Applies initial formatting to the orderbook download.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+
+SELECT ob.[Sales document]
+      ,[Collective Number]
+      ,ob.[Customer PO number]
+      ,ob.[Customer]
+      ,[Customer Name]
+	  ,ob.[Username]
+      ,ob.[2nd Order]
+      ,[Your Reference]
+      ,ob.[Sales Person]
+      ,[Sales Person Name]
+      ,case when ob.[Shipping status] = 'shipped, not invoice' and [biling document] not like '#' then 'shipped and invoiced' else ob.[Shipping status] end as [Shipping status]
+      ,ob.[Consignee]
+      ,[Consignee Name]
+      ,ob.[Main Material]
+      ,[Product hier#lev# 2]
+      ,ob.[Product Area]
+      ,[Product area name]
+      ,[Product hier#lev# 1]
+      ,[Product hier#lev# 1 name]
+      ,ob.[Material group]
+      ,[Material group name]
+      ,[Equipment]
+      ,[Postal Code (Equipme]
+      ,vsd.Meaning as District
+      ,so.Meaning as Office
+      ,vsg.Meaning as [Group]
+      ,ob.[Framework Partner]
+      ,ob.[Leasing type]
+      ,ob.[Document Date]
+      ,[Leasing Company]
+      ,[Lease Company Name]
+      ,[Linking Pin Falcon]
+      ,ob.[Customer condition G]
+      ,ob.[Calendar Year/Month]
+      ,cast([Total Revenue] as decimal(10,2)) as [Total Revenue] 
+      ,cast([Lease Settlement] as decimal(10,2)) as [Lease Settlement]
+      ,cast([Revenue Salesperson] as decimal(10,2)) as [Revenue Salesperson]
+      ,cast([Deduction] as decimal(10,2)) as [Deduction]
+      ,cast([Commissionable Revenue] as decimal(10,2)) as [Commissionable Revenue]
+      ,cast([Honours Club Adjust#] as decimal(10,2)) as [Honours Club Adjust#]
+      ,cast([Sales Base] as decimal(10,2)) as [Sales Base]
+      ,cast([Calc# Salesperson GP] as decimal(10,2)) as [Calc# Salesperson GP]
+      ,CASE 
+		WHEN cast(ob.[Revenue Region] as decimal(10,2)) is null THEN cast(ob.[Revenue Salesperson] as decimal(10,2))
+		WHEN cast(ob.[Revenue Region] as decimal(10,2)) = 0.00 THEN cast(ob.[Revenue Salesperson] as decimal(10,2))
+			ELSE ob.[Revenue Region]
+				END as [Revenue Region]
+	,CASE 
+		WHEN cast(ob.[Revenue Region] as decimal(10,2)) is null THEN 'Revenue Sales Person'
+		WHEN cast(ob.[Revenue Region] as decimal(10,2)) = 0.00 THEN 'Revenue Sales Person'
+			ELSE 'Revenue Region'
+				END as 'Revenue Locator'
+      ,[ITP Price]
+      ,[Region GP]
+      ,[Sales quantity]
+	  ,CASE 
+			WHEN CASE
+					WHEN crm.[Business Unit] IS NOT NULL THEN crm.[Business Unit]
+					WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+					WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN 'Medicial'
+					WHEN busc.[Business Unit] IS not null then busc.[Business Unit]
+						Else busc2.[Business Unit]
+							END = 'BGB - Disabled Users' THEN CASE 
+																WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+																WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN 'Medicial'
+																WHEN busc.[Business Unit] IS not null then busc.[Business Unit]
+																	Else busc2.[Business Unit]
+																		END
+		WHEN crm.[Business Unit] IS NOT NULL THEN crm.[Business Unit]
+		WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+		WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN 'Medicial'
+		WHEN busc.[Business Unit] IS not null then busc.[Business Unit]
+		WHEN abu.[Business Unit] IS not null then abu.[Business Unit]
+			Else busc2.[Business Unit]
+				END as [Business Unit]
+	  ,CASE 
+			WHEN CASE
+					WHEN bu.[Business Unit] IS NOT NULL THEN bu.[SALES AREA]
+					WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'MGI'
+					WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN null
+					WHEN busc.Sales_Area_CRM IS not null then busc.Sales_Area_CRM
+						ELSE busc2.Sales_Area_CRM
+							END = 'LEFT BGB' THEN CASE
+														WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'MGI'
+														WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN null
+														WHEN busc.Sales_Area_CRM IS not null then busc.Sales_Area_CRM
+															ELSE busc2.Sales_Area_CRM
+																END
+			WHEN bu.[Business Unit] IS NOT NULL THEN bu.[SALES AREA]
+			WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'MGI'
+			WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN null
+			WHEN busc.Sales_Area_CRM IS not null then busc.Sales_Area_CRM
+			WHEN abu.Sales_Area_CRM IS not null then abu.Sales_Area_CRM
+				ELSE busc2.Sales_Area_CRM
+					END as Sales_Area_CRM
+	  ,CASE 
+			WHEN CASE 
+					WHEN bu.[Business Unit] is not null THEN bu.[SALES DISTRICT ]
+					WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Private'
+					WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN 'Medicial'
+					WHEN busc.Sales_District_CRM IS not null then busc.Sales_District_CRM
+						Else busc2.Sales_District_CRM
+							END = 'DISABLED USER' THEN CASE 
+															WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Private'
+															WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN 'Medical'
+															WHEN busc.Sales_District_CRM IS not null then busc.Sales_District_CRM
+																Else busc2.Sales_District_CRM
+																	END
+				 
+			WHEN bu.[Business Unit] is not null THEN bu.[SALES DISTRICT ]
+			WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Private'
+			WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN 'Medical'
+			WHEN busc.Sales_District_CRM IS not null then busc.Sales_District_CRM
+			WHEN abu.Sales_District_CRM IS not null then abu.Sales_District_CRM
+				Else busc2.Sales_District_CRM
+						END as Sales_District_CRM
+	  ,CASE
+			WHEN CASE 
+					WHEN bu.[Business Unit] IS not null then bu.[SALES OFFICE]
+	  				WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN NULL
+					WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN NULL
+					WHEN busc.Sales_Office_CRM IS not null then busc.Sales_Office_CRM
+						else busc2.Sales_Office_CRM
+							END = 'LEFT BGB' THEN CASE 
+														WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN NULL
+														WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN NULL
+														WHEN busc.Sales_Office_CRM IS not null then busc.Sales_Office_CRM
+															else busc2.Sales_Office_CRM
+																END
+			WHEN bu.[Business Unit] is not null THEN bu.[SALES OFFICE]
+	  		WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN NULL
+			WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN NULL
+			WHEN busc.Sales_Office_CRM IS not null then busc.Sales_Office_CRM
+			WHEN abu.Sales_Office_CRM IS not null then abu.Sales_Office_CRM
+				else busc2.Sales_Office_CRM
+					END as Sales_Office_CRM
+	  ,CASE 
+			WHEN CASE 
+					WHEN bu.[Business Unit] is not null THEN bu.[SALES TEAM]
+	  				WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+					WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN NULL
+					WHEN busc.Sales_Team_CRM IS not null then busc.Sales_Team_CRM
+						else busc2.Sales_Team_CRM
+							END = 'LEFT BGB' THEN CASE 
+	  													WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+														WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN NULL
+														WHEN busc.Sales_Team_CRM IS not null then busc.Sales_Team_CRM
+															else busc2.Sales_Team_CRM
+																END
+			WHEN bu.[Business Unit] is not null THEN bu.[SALES TEAM]
+	  		WHEN [Product hier#lev# 1 name] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+			WHEN [Product hier#lev# 1 name] = 'Healthcare' THEN NULL
+			WHEN busc.Sales_Team_CRM IS not null then busc.Sales_Team_CRM
+			WHEN abu.Sales_Team_CRM IS not null then abu.Sales_Team_CRM
+				else busc2.Sales_Team_CRM
+					END as Sales_Team_CRM
+	  ,dosm.Channel
+	  ,Dosm.Region
+	  ,'Orderbook' as [Type]
+	  ,CASE
+			--WHEN bwh.Category = 'Rental and Service' THEN 'Rental'
+			WHEN opcm.[Prod Area] is not null THEN opcm.[Prod Area]
+				ELSE 'Error'
+					END as 'Product Area Category'
+	,dsrl.[Product Area1]
+	,'4000' as Company
+	,dosm.[Hard / Non Hard] as 'Hard / Non Hard'
+	,'24' as [Distribution Channel]
+	,'New' as Unit
+	,CASE
+		WHEN ob.[Material Group Name] = 'Machines' THEN ob.[Sales quantity]
+			ELSE 0
+				END as Units
+	,CASE
+		WHEN CHARINDEX('Konica',ob.[Customer Name],0)>0 THEN 'KONICA'
+			ELSE '1'
+				END as RENTAL_CHECK
+	,CASE 
+		WHEN cast([Revenue Region] as decimal(10,2)) is null THEN cast([Revenue Salesperson] as decimal(10,2)) * dsd.Defer
+		WHEN cast([Revenue Region] as decimal(10,2)) = 0.00 THEN cast([Revenue Salesperson] as decimal(10,2)) * dsd.Defer
+			ELSE cast([Revenue Region] as decimal(10,2)) * dsd.Defer
+				END as [Sol Deferral]
+	,CASE WHEN ob.[Framework Partner] IN ('FMP-GPS3', 'FMP-16CPC3', 'FMP-3781L3') THEN 0 ELSE CASE
+																								WHEN dsd.Defer Is not null then CASE 
+																																	WHEN cast([Revenue Region] as decimal(10,2)) is null THEN cast([Revenue Salesperson] as decimal(10,2)) - (cast([Revenue Salesperson] as decimal(10,2)) * dsd.Defer)
+																																	WHEN cast([Revenue Region] as decimal(10,2)) = 0 THEN cast([Revenue Salesperson] as decimal(10,2)) - (cast([Revenue Salesperson] as decimal(10,2)) * dsd.Defer)
+																																		ELSE cast([Revenue Region] as decimal(10,2)) - (cast([Revenue Region] as decimal(10,2)) * dsd.Defer)
+																																			END 
+																									else CASE 
+																											WHEN cast(ob.[Revenue Region] as decimal(10,2)) is null THEN cast(ob.[Revenue Salesperson] as decimal(10,2))
+																											WHEN cast(ob.[Revenue Region] as decimal(10,2)) = 0 THEN cast(ob.[Revenue Salesperson] as decimal(10,2))
+																												ELSE cast(ob.[Revenue Region] as decimal(10,2))
+																													END
+																														end 
+				end as [Rev region less Sol defer]
+	,CASE
+		WHEN RTRIM(LTRIM(ob.[Sales Person Name])) = 'Training GB' THEN 'Exclude'
+		WHEN ob.[Sales Person] = 'Exclude' THEN 'Exclude'
+		WHEN ob.[Sales Person] = 'Incorrect salesman' AND ob.[Total Revenue] = 0 THEN 'Exclude'
+		WHEN RIGHT(ob.[Customer condition G],4) = 'vant' THEN 'Exclude'
+		WHEN RIGHT(RTRIM(LTRIM(ob.[Customer condition G])),4) = 'mple' THEN 'Exclude'
+		WHEN RTRIM(LTRIM(ob.[Customer condition G])) = '4T' THEN 'Exclude'
+		WHEN RTRIM(LTRIM(ob.[Customer condition G])) = '4X' THEN 'Exclude'
+		WHEN obq2.[Order Number] is not null  THEN 'Exclude'
+		WHEN obq.[Sales document] is not null THEN 'Exclude'
+			ELSE ''
+				END as Exclude
+	,CASE
+		WHEN CHARINDEX('PP',ob.[Product Area],0)>0 THEN 'PP'
+			ELSE ''
+				END as PP_Deal
+	,CASE
+		WHEN mco.[Carry Over] IS NOT NULL THEN 'Carry Over'
+			ELSE 'New Order'
+				END as [Carry Over]
+	,CASE	
+		WHEN (RIGHT(ob.[Customer condition G],4)='vant' OR RIGHT(ob.[Customer condition G],4)='mple') AND cast(ob.[Revenue Salesperson] as decimal(10,2)) > 0 THEN 'Error'
+			ELSE ''
+				END as 'Trial, Not Relevant or not Assigned with Values'
+	,CASE	
+		WHEN ob.[Shipping status] = 'shipped, not invoice' AND ob.[Product hier#lev# 1 name] = 'Solutions' THEN 'Error'
+			ELSE ''
+				END as [Solutions, shipped not invoiced]
+	,CASE	
+		WHEN CHARINDEX('UNI ',ob.[Customer Name],0) > 0 THEN 'UNI Error'
+		WHEN CHARINDEX('bc',ob.[Customer Name],0) > 0 THEN 'BC Error'
+		WHEN CHARINDEX('/',ob.[Customer Name],0) > 0 THEN '/ Error'
+		WHEN CHARINDEX('.',ob.[Customer Name],0) > 0 THEN '. Error'
+			ELSE ''
+				END as Error_In_Name
+	,CASE
+		WHEN ob.[Your reference] = 'N/A' or ob.[Your reference] = 'NONE' or ob.[Your reference] = 'NA' THEN 'Error'
+			Else ''
+				End as 'No CRM Quote ID'
+	,CASE
+		WHEN dosm.Channel like '%Public%' AND ob.[Framework Partner] like '%Not assigned%' THEN 'Error'
+			Else ''
+				End as 'No framework partner'
+	,CASE
+		WHEN ob.[Sales Person Name] like '%Not assigned%' THEN 'Error'
+			Else ''
+				End as 'Salesmand not assigned'
+	,CASE WHEN vsd.Meaning <> SPFER.[District                   (Sales District)] THEN 'Error'
+		ELSE '' END AS [SALES DISTRICT ERROR]
+	,CASE WHEN vsg.Meaning <> SPFER.[Branch                    (Sales group)] THEN 'Error'
+		ELSE '' END AS [SALES GROUP ERROR]
+	,CASE	
+		WHEN (RIGHT(ob.[Customer condition G],4)='vant' OR RIGHT(ob.[Customer condition G],4)='mple') AND cast(ob.[Revenue Salesperson] as decimal(10,2))>0 THEN 'Error'
+		WHEN ob.[Shipping status] = 'shipped, not invoice' AND ob.[Product hier#lev# 1 name] = 'Solutions' THEN 'Error'
+		WHEN CHARINDEX('UNI ',ob.[Customer Name],0) > 0 THEN 'Error'
+		WHEN CHARINDEX('bc',ob.[Customer Name],0) > 0 THEN 'Error'
+		WHEN CHARINDEX('/',ob.[Customer Name],0) > 0 THEN 'Error'
+		WHEN CHARINDEX('.',ob.[Customer Name],0) > 0 THEN 'Error'
+		WHEN ob.[Your reference] = 'N/A' or ob.[Your reference] = 'NONE' THEN 'Error'
+		WHEN bu.[SALES DISTRICT ] = 'Public' AND ob.[Framework Partner] = '101/Not assigned' THEN 'Error'
+		WHEN ob.[Sales Person] = 'Not assigned' THEN 'Error'
+		WHEN vsd.Meaning <> SPFER.[District                   (Sales District)] THEN 'Error'
+		WHEN vsg.Meaning <> SPFER.[Branch                    (Sales group)] THEN 'Error'
+			Else ''
+				End as 'Error Check'
+	into #obformat 
+  FROM [base].[COMMISSIONS_OB] ob
+LEFT JOIN lup.CRM_OB_SALES_PERSON_JOIN spj
+	ON CAST(ob.[Sales Person Name] as NVARCHAR(MAX)) = CAST(spj.OB as NVARCHAR(MAX))
+LEFT JOIN lup.CRM_USERS crm
+	ON CAST(spj.CRM as NVARCHAR(MAX)) = CAST(crm.[Full Name] as NVARCHAR(MAX))
+LEFT JOIN #CRMBUSINESSUNITS bu
+	ON CAST(bu.[BUSINESS UNIT] as NVARCHAR(MAX)) = CAST(crm.[Business Unit] as NVARCHAR(MAX))
+LEFT JOIN lup.DSR_LOOKUPS dsrl
+	ON CAST(dsrl.[Product Hierarchy 1] as NVARCHAR(MAX)) = CAST(ob.[Product area name] as NVARCHAR(MAX))
+LEFT JOIN lup.DSR_LOOKUPS aa
+	ON CAST(aa.Sales_Group as NVARCHAR(MAX)) = CAST(ob.[Sales group] as NVARCHAR(MAX))
+LEFT JOIN lup.DSR_LOOKUPS ab
+	ON CAST(aa.Sales_Group_Name as NVARCHAR(MAX)) = CAST(ab.[Sales group (act)] as NVARCHAR(MAX))
+LEFT JOIN (SELECT * FROM (SELECT *, ROW_NUMBER () OVER (PARTITION BY [Main Material] ORDER BY [Main Material]) kd FROM lup.DSR_SOLUTION_DEFERRAL) kd WHERE kd = 1 ) dsd
+	ON CAST(dsd.[Main Material] as NVARCHAR(MAX)) = CAST(ob.[Main Material] as NVARCHAR(MAX))
+LEFT JOIN dsr.OB_QUERIES_2 obq2
+	ON CAST(obq2.[Order Number] as NVARCHAR(MAX)) = CAST(ob.[Sales document] as NVARCHAR(MAX)) AND
+	CAST(obq2.[Value] as NVARCHAR(MAX)) = CAST(ob.[Total Revenue] as NVARCHAR(MAX))
+LEFT JOIN dsr.OB_QUERIES obq
+	ON CAST(obq.[Sales document] as NVARCHAR(MAX)) = CAST(ob.[Sales document] as NVARCHAR(MAX))
+LEFT JOIN #CARRYOVER mco
+	ON mco.[Sales Document] = ob.[Main Material]+ob.[Sales document]
+LEFT JOIN lup.VERT_SALES_DISTRICTS vsd
+	on vsd.Code = ob.[Sales District]
+LEFT JOIN lup.VERT_SALES_GROUPS vsg
+	on vsg.Code	 = ob.[Sales group]
+LEFT JOIN lup.SALES_OFFICE_MEANING so
+	on so.code = ob.[Sales Office]
+LEFT JOIN [lup].[CRM_BUSINESS_UNITS_FROM_SAP_CODES] busc
+	on busc.Code = vsd.Meaning+so.Meaning+vsg.Meaning
+LEFT JOIN [lup].[CRM_BUSINESS_UNITS_FROM_SAP_CODES] busc2
+	on busc2.Code = vsd.Meaning
+LEFT JOIN  [lup].[DSR_ADDITIONAL_BUSINESS_UNITS] abu
+	on CAST(ob.[Sales document] as INT) = CAST(abu.[Sales document] as int)
+LEFT JOIN [lup].[DSR_OLD_STYLE_MAPPING] dosm
+	on LTRIM(RTRIM(dosm.[Mapping Key])) = 'Hard'+LTRIM(RTRIM(vsd.Meaning))+LTRIM(RTRIM(so.Meaning))+LTRIM(RTRIM(vsg.Meaning))
+LEFT JOIN [lup].[DSR_ORDERBOOK_PRODUCT_CODE_MAPPING] opcm
+	on opcm.[Product Key] = [Product area name]+[Product hier#lev# 1 name]
+left join lup.DSR_SALES_PERSON_FOR_ERROR_REPORT spfer
+	ON SPFER.[Sales person] = OB.[Sales Person Name]
+
+
+
+
+DELETE FROM dsr.FDT_ORDERBOOK_FORMATTED
+INSERT INTO dsr.FDT_ORDERBOOK_FORMATTED
+
+
+select 
+	[Sales document],
+	[Collective Number],
+	[Customer PO number],
+	[Customer],
+	[Customer Name],
+	[2nd Order],
+	[Your Reference],
+	[Sales Person],
+	[Sales Person Name],
+	[Shipping status],
+	[Consignee],
+	[Consignee Name],
+	[Main Material],
+	[Product hier#lev# 2],
+	[Product Area],
+	[Product area name],
+	[Product hier#lev# 1],
+	[Product hier#lev# 1 name],
+	[Material group],
+	[Material group name],
+	[Equipment],
+	[Postal Code (Equipme],
+	[District],
+	[Office],
+	[Group],
+	[Framework Partner],
+	[Leasing type],
+	[Document Date],
+	[Leasing Company],
+	[Lease Company Name],
+	[Linking Pin Falcon],
+	[Customer condition G],
+	[Calendar Year/Month],
+	[Total Revenue],
+	[Lease Settlement],
+	[Revenue Salesperson],
+	[Deduction],
+	[Commissionable Revenue],
+	[Honours Club Adjust#],
+	[Sales Base],
+	[Calc# Salesperson GP],
+	[Revenue Region],
+	[ITP Price],
+	[Region GP],
+	[Sales quantity],
+	[Business Unit],
+	[Sales_Area_CRM],
+	[Sales_District_CRM],
+	[Sales_Office_CRM],
+	[Sales_Team_CRM],
+	Channel,
+	Region,
+	[Type],
+	[Product Area Category],
+	[Product Area1],
+	[Company],
+	[Hard / Non Hard],
+	[Distribution Channel],
+	[Unit],
+	[Units],
+	[RENTAL_CHECK],
+	[Sol Deferral],
+	[Rev region less Sol defer],
+	[Exclude],
+	[PP_Deal],
+	[Carry Over],
+	[Trial, Not Relevant or not Assigned with Values],
+	[Solutions, shipped not invoiced],
+	[Error_In_Name],
+	[No CRM Quote ID],
+	[No framework partner],
+	[Salesmand not assigned],
+	[Error Check]
+	 from (
+		SELECT 
+				a.[Sales document],
+				a.[Collective Number],
+				a.[Customer PO number],
+				a.[Customer],
+				a.[Customer Name],
+				a.[2nd Order],
+				a.[Your Reference],
+				a.[Sales Person],
+				a.[Sales Person Name],
+				a.[Shipping status],
+				a.[Consignee],
+				a.[Consignee Name],
+				a.[Main Material],
+				a.[Product hier#lev# 2],
+				a.[Product Area],
+				a.[Product area name],
+				a.[Product hier#lev# 1],
+				a.[Product hier#lev# 1 name],
+				a.[Material group],
+				a.[Material group name],
+				a.[Equipment],
+				a.[Postal Code (Equipme],
+				a.[District],
+				a.[Office],
+				a.[Group],
+				a.[Framework Partner],
+				a.[Leasing type],
+				a.[Document Date],
+				a.[Leasing Company],
+				a.[Lease Company Name],
+				a.[Linking Pin Falcon],
+				a.[Customer condition G],
+				a.[Calendar Year/Month],
+				a.[Total Revenue],
+				a.[Lease Settlement],
+				a.[Revenue Salesperson],
+				a.[Deduction],
+				a.[Commissionable Revenue],
+				a.[Honours Club Adjust#],
+				a.[Sales Base],
+				a.[Calc# Salesperson GP],
+				a.[Revenue Region],
+				a.[Revenue Locator],
+				a.[ITP Price],
+				a.[Region GP],
+				a.[Sales quantity],
+				a.[Business Unit],
+				a.[Sales_Area_CRM],
+				a.[Sales_District_CRM],
+				a.[Sales_Office_CRM],
+				a.[Sales_Team_CRM],
+				a.Channel,
+				a.Region,
+				a.[Type],
+				a.[Product Area Category],
+				a.[Product Area1],
+				a.[Company],
+				a.[Hard / Non Hard],
+				a.[Distribution Channel],
+				a.[Unit],
+				a.[Units],
+				a.[RENTAL_CHECK],
+				a.[Sol Deferral],
+				a.[Rev region less Sol defer],
+				a.[Exclude],
+				a.[PP_Deal],
+				a.[Carry Over],
+				a.[Trial, Not Relevant or not Assigned with Values],
+				a.[Solutions, shipped not invoiced],
+				a.[Error_In_Name],
+				a.[No CRM Quote ID],
+				a.[No framework partner],
+				a.[Salesmand not assigned],
+				a.[Error Check]
+		FROM #OBFORMAT a
+		WHERE [Calendar Year/Month] = @MONTH
+			UNION ALL
+				select 
+					a.[Sales document],
+					a.[Collective Number],
+					a.[Customer PO number],
+					a.[Customer],
+					a.[Customer Name],
+					a.[2nd Order],
+					a.[Your Reference],
+					a.[Sales Person],
+					a.[Sales Person Name],
+					a.[Shipping status],
+					a.[Consignee],
+					a.[Consignee Name],
+					a.[Main Material],
+					a.[Product hier#lev# 2],
+					a.[Product Area],
+					a.[Product area name],
+					a.[Product hier#lev# 1],
+					a.[Product hier#lev# 1 name],
+					a.[Material group],
+					a.[Material group name],
+					a.[Equipment],
+					a.[Postal Code (Equipme],
+					a.[District],
+					a.[Office],
+					a.[Group],
+					a.[Framework Partner],
+					a.[Leasing type],
+					a.[Document Date],
+					a.[Leasing Company],
+					a.[Lease Company Name],
+					a.[Linking Pin Falcon],
+					a.[Customer condition G],
+					a.[Calendar Year/Month],
+					a.[Total Revenue],
+					a.[Lease Settlement],
+					a.[Revenue Salesperson],
+					a.[Deduction],
+					a.[Commissionable Revenue],
+					a.[Honours Club Adjust#],
+					a.[Sales Base],
+					a.[Calc# Salesperson GP],
+					a.[Revenue Region],
+					a.[Revenue Locator],
+					a.[ITP Price],
+					a.[Region GP],
+					a.[Sales quantity],
+					a.[Business Unit],
+					a.[Sales_Area_CRM],
+					a.[Sales_District_CRM],
+					a.[Sales_Office_CRM],
+					a.[Sales_Team_CRM],
+					a.Channel,
+					a.Region,
+					a.[Type],
+					a.[Product Area Category],
+					a.[Product Area1],
+					a.[Company],
+					a.[Hard / Non Hard],
+					a.[Distribution Channel],
+					a.[Unit],
+					a.[Units],
+					a.[RENTAL_CHECK],
+					a.[Sol Deferral],
+					a.[Rev region less Sol defer],
+					a.[Exclude],
+					a.[PP_Deal],
+					a.[Carry Over],
+					a.[Trial, Not Relevant or not Assigned with Values],
+					a.[Solutions, shipped not invoiced],
+					a.[Error_In_Name],
+					a.[No CRM Quote ID],
+					a.[No framework partner],
+					a.[Salesmand not assigned],
+					a.[Error Check]
+				from #oBFORMAT A
+				JOIN #CARRYOVER B
+					ON CAST(A.[Sales document] as INT) = CAST(B.[SALES DOC TO USE] as INT)
+				--JOIN (SELECT * FROM [dsr].[BW_HARD] WHERE [SALES DOCUMENT] not like '#')  C
+				--	ON CAST(A.[SALES DOCUMENT] as INT) = CAST(C.[SALES DOCUMENT] as INT)
+					Where [Calendar Year/Month] <> @MONTH /*and c.[sales document] not like '19963834#'*/
+				GROUP  BY
+					a.[Sales document],
+					a.[Collective Number],
+					a.[Customer PO number],
+					a.[Customer],
+					a.[Customer Name],
+					a.[2nd Order],
+					a.[Your Reference],
+					a.[Sales Person],
+					a.[Sales Person Name],
+					a.[Shipping status],
+					a.[Consignee],
+					a.[Consignee Name],
+					a.[Main Material],
+					a.[Product hier#lev# 2],
+					a.[Product Area],
+					a.[Product area name],
+					a.[Product hier#lev# 1],
+					a.[Product hier#lev# 1 name],
+					a.[Material group],
+					a.[Material group name],
+					a.[Equipment],
+					a.[Postal Code (Equipme],
+					a.[District],
+					a.[Office],
+					a.[Group],
+					a.[Framework Partner],
+					a.[Leasing type],
+					a.[Document Date],
+					a.[Leasing Company],
+					a.[Lease Company Name],
+					a.[Linking Pin Falcon],
+					a.[Customer condition G],
+					a.[Calendar Year/Month],
+					a.[Total Revenue],
+					a.[Lease Settlement],
+					a.[Revenue Salesperson],
+					a.[Deduction],
+					a.[Commissionable Revenue],
+					a.[Honours Club Adjust#],
+					a.[Sales Base],
+					a.[Calc# Salesperson GP],
+					a.[Revenue Region],
+					a.[Revenue Locator],
+					a.[ITP Price],
+					a.[Region GP],
+					a.[Sales quantity],
+					a.[Business Unit],
+					a.[Sales_Area_CRM],
+					a.[Sales_District_CRM],
+					a.[Sales_Office_CRM],
+					a.[Sales_Team_CRM],
+					a.[Type],
+					a.[Product Area Category],
+					a.[Product Area1],
+					a.[Company],
+					a.[Hard / Non Hard],
+					a.[Distribution Channel],
+					a.[Unit],
+					a.[Units],
+					a.[RENTAL_CHECK],
+					a.[Sol Deferral],
+					a.[Rev region less Sol defer],
+					a.[Exclude],
+					a.[PP_Deal],
+					a.[Carry Over],
+					a.[Trial, Not Relevant or not Assigned with Values],
+					a.[Solutions, shipped not invoiced],
+					a.[Error_In_Name],
+					a.[No CRM Quote ID],
+					a.[No framework partner],
+					a.[Salesmand not assigned],
+					a.[Error Check],
+					a.channel,
+				a.region ) Kd
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+delete from fmp.FULL_ORDERBOOK_FORMATTED 
+insert into fmp.FULL_ORDERBOOK_FORMATTED 
+
+
+
+SELECT *  FROM #OBFORMAT 
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_MASTER
+-----------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM dsr.FDT_ORDERBOOK_MASTER
+INSERT INTO dsr.FDT_ORDERBOOK_MASTER
+
+SELECT
+	a.[Sales document],
+	a.[Customer Name],
+	a.[Sales Person Name],
+	a.[Shipping status],
+	a.[Consignee Name],
+	a.[Main Material],
+	a.[Product hier#lev# 2] AS [Product Hierarchy Level 2],
+	a.[Product area name] as [Product Area],
+	a.[Product hier#lev# 1 name] as [Product Hierarchy Level 1],
+	a.[Material group name] as [Material Group],
+	a.[Equipment],
+	a.[District],
+	a.[Office] as [Region],
+	a.[Group] as [Branch],
+	a.[Framework Partner],
+	a.[Document Date],
+	a.[Lease Company Name],
+	a.[Customer condition G],
+	a.[Calendar Year/Month],
+	a.[Total Revenue],
+	a.[Lease Settlement],
+	a.[Revenue Salesperson],
+	a.[Deduction],
+	a.[Commissionable Revenue],
+	a.[Honours Club Adjust#] as [Honours Club Adjustment],
+	a.[Sales Base],
+	a.[Calc# Salesperson GP] as [Calc Salesperson GP],
+	a.[Revenue Region],
+	a.[ITP Price],
+	a.[Region GP],
+	a.[Sales quantity],
+	a.Channel as DSR_Channel,
+	a.Region as DSR_Region,
+	a.[Type],
+	a.[Product Area Category],
+	a.[Units],
+	a.[Sol Deferral],
+	a.[Rev region less Sol defer]
+FROM #obformat A
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_INDIRECT_FORMATTED This is the formatting of the dealer order book 
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+DELETE FROM dsr.FDT_ORDERBOOK_INDIRECT_FORMATTED
+INSERT INTO dsr.FDT_ORDERBOOK_INDIRECT_FORMATTED
+
+
+
+SELECT [Distribution channel]
+      ,[Name]
+      ,[Sales Office (act)]
+      ,[Area]
+      ,[Sales group (act)]
+      ,ob.[Region]
+      ,[Sales District (act)]
+      ,[Id#Hardware]
+      ,[Product Area]
+      ,[Material group]
+      ,[Prod hier#lev# 1 (act)]
+      ,REPLACE([Open Quantity],'PCS','') as [Open Quantity]
+      ,[Open Value]
+	  ,CASE
+		WHEN CHARINDEX('A4',[Prod hier#lev# 1 (act)],0)>0 THEN 'Office SFP'
+		WHEN CHARINDEX('SOL',[Prod hier#lev# 1 (act)],0)>0 THEN 'Solutions'
+			ELSE [Product Area]
+				END as Product
+		,'ORDERBOOK' as Type
+		,opcm.[Prod Area] as Product_Group
+		,4000 as Company_Code
+		,CASE WHEN [Material group] = 'Consumables' THEN 'Non Hard'
+			  WHEN [Material group] = 'Spare Parts' THEN 'Non Hard'
+				Else dosm.[Hard / Non Hard] end as Hard_Non_Hard
+		,'Dealer' as Sales_District
+		,'Region 1' as [Sales Region]
+		,'Indirect' as [Sales District]
+		,CASE
+			WHEN [Material group] = 'Machines' THEN REPLACE([Open Quantity],'PCS','')
+				ELSE 0
+					END  as Units
+		,CASE WHEN [Distribution channel] = 21 THEN 'Dealer'
+			ELSE Channel END as Channel
+		,CASE WHEN [Distribution channel] = 21 THEN 'IT Channel'
+			ELSE dosm.Region END as Sales_Region
+	
+  FROM [dsr].[DEALER_ORDERBOOK] ob
+  LEFT JOIN [lup].[DSR_OLD_STYLE_MAPPING] dosm
+	on LTRIM(RTRIM(dosm.[Mapping Key])) = 'Hard'+LTRIM(RTRIM([Sales District (act)]))+LTRIM(RTRIM(Area))+LTRIM(RTRIM(ob.Region))
+	LEFT JOIN lup.DSR_ORDERBOOK_PRODUCT_CODE_MAPPING opcm
+		on opcm.[Product Key] = ob.[Product Area]+ob.[Prod hier#lev# 1 (act)]
+
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_BW_FORMATTED This is the formatting of the hard and Non hard BW
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Delete From dsr.FDT_BW_FORMATTED
+Insert into dsr.FDT_BW_FORMATTED
+
+
+
+
+SELECT 
+	[Company Code],
+	[Distribution channel],
+	[Costelement],
+	[Sales Office (act)],
+	[Area],
+	[Sales District (act)],
+	[Sales group (act)],
+	[Product Area],
+	[Material group (act)],
+	[Category],
+	[Customer],
+	[Customer Name],
+	[Sales document],
+	[Product hier#lev# 6],
+	[Quality Standard],
+	[Name],
+	[Product hier#lev# 1],
+	[Maintenance Plant],
+	[Material],
+	[NET SALES],
+	[SD GS Others],
+	[Total Quantity2],
+	[NET SALES1],
+	[Total Quantity],
+	[Information],
+	[Hard_Non_Hard],
+	[P.Area],
+	[Company],
+	[OLD_DSR_SALES_CHANNEL],
+	[Region],
+	[Amount (£)],
+	[Quality_Standard],
+	[Units],
+	[Area2],
+	CAST([ZERO CHECK] as nvarchar(max)) as [ZERO CHECK],
+	[Carry Over],
+	[Sol Def],
+	[Sol Total],
+	Rebate_Amount as Rebate_Percentage,
+	[CRM_Business_Unit],
+	[CRM_Sales_Area],
+	[CRM_Sales_District],
+	[CRM_Sales_Office],
+	[CRM_Sales_Team],
+	CASE WHEN [Distribution channel] = 21 then 'Dealer'
+		ELSE Channel end as Channel
+	,CASE WHEN [Distribution channel] = 21 then 'IT Channel'
+		ELSE Sales_Region end as Sales_Region
+
+		FROM(
+			SELECT bwh.[Company Code]
+				  ,bwh.[Distribution channel]
+				  ,[Costelement]
+				  ,so.meaning as [Sales Office (act)]
+				  ,[Area]
+				  ,[Sales District (act)]
+				  ,[Sales group (act)]
+				  ,bwh.[Product Area]
+				  ,[Material group (act)]
+				  ,[Category]
+				  ,bwh.[Customer]
+				  ,bwh.[Customer Name]
+				  ,bwh.[Sales document]
+				  ,[Product hier#lev# 6]
+				  ,bwh.[Quality Standard]
+				  ,[Name]
+				  ,bwh.[Product hier#lev# 1]
+				  ,[Maintenance Plant]
+				  ,[Material]
+				  ,[NET SALES]
+				  ,[SD GS Others]
+				  ,[Total Quantity2]
+				  ,[NET SALES1]
+				  ,[Total Quantity]
+				  ,'Actual' as Information
+				  ,CASE WHEN dosm.[Hard / Non Hard] IS NULL then 'Hard' ELSE dosm.[Hard / Non Hard] END as Hard_Non_Hard
+				  ,CASE 
+					WHEN bwh.Category = 'Rental and Service' THEN 'Rental'
+					ELSE
+						opcm.[Prod Area] END as [P.Area]
+				,CASE
+					WHEN bwh.[Sales Office (act)] = '#' THEN bwh.[Company Code]
+						ELSE dcc.[Company Code]	
+							END as Company
+				,CASE
+					WHEN bwh.area = 'MGI' THEN 'Public Sector'
+					WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+					WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+					WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+					WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+						ELSE dd.District1
+							END as OLD_DSR_SALES_CHANNEL
+				,CASE
+					WHEN bwh.[Sales District (act)] = 'Aberdeen' THEN 'Aberdeen'
+					WHEN CASE
+								WHEN bwh.area = 'MGI' THEN 'Public Sector'
+								WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+								WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+								WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+								WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+									ELSE dd.District1
+										END = 'IT Channel' AND bwh.[Distribution channel] = 24 THEN 'Other'
+						ELSE dsl.[ENT/SME]
+							END as [Region]
+				,CASE
+							WHEN bwh.[Sales Office (act)] = '4200' THEN 0 
+							else (CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(CASE WHEN bwh.[SD GS Others] IS NULL THEN 0.00 ELSE CAST(bwh.[SD GS Others] as decimal(10,2)) END as decimal(10,2)))  - 
+										((CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(CASE WHEN bwh.[SD GS Others] IS NULL THEN 0.00 ELSE CAST(bwh.[SD GS Others] as decimal(10,2)) END as decimal(10,2))) * CASE WHEN R.AMOUNT is null THEN 0 ELSE R.AMOUNT END ) - 
+													((CAST(bwh.[NET SALES] as decimal(10,2)) * CASE WHEN sd.Defer is NULL Then 0 ELSE sd.Defer END))
+						END as [Amount (£)]
+				,dqs.[Type] as Quality_Standard
+				,CASE 
+					WHEN CAST(bwh.[Sales Office (act)] as NVARCHAR(MAX)) =  '4200' THEN 0
+					WHEN bwh.category = 'Machines' THEN CASE
+																		WHEN CASE
+																				WHEN bwh.area = 'MGI' THEN 'Public Sector'
+																				WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+																				WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+																				WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+																				WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+																					ELSE dd.District1
+																						END = 'IT Channel' AND bwh.Customer = 389354 THEN 0
+																		WHEN dqs.[Type] = 'NEW' THEN [Total Quantity]
+																		END
+	
+						ELSE 0
+							END as Units
+				,CASE
+					WHEN CAST(bwh.[Sales Office (act)] as NVARCHAR(MAX)) = '4200' THEN ''
+						Else CASE	
+								WHEN 
+									CASE
+										WHEN bwh.area = 'MGI' THEN 'Public Sector'
+										WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+										WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+										WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+										WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+											ELSE dd.District1
+												END = 'Dealer' THEN ddb.Branch
+								END
+						END as 'Area2'
+				,CAST( CASE 
+					WHEN CAST (CASE
+						WHEN bwh.[Sales Office (act)] = '#' THEN CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(bwh.[SD GS Others] as decimal(10,2))
+							ELSE CASE 
+							WHEN bwh.[Sales Office (act)] = 4200 THEN 0
+								ELSE CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(bwh.[SD GS Others] as decimal(10,2))
+									END 
+						END + CASE 
+									WHEN CAST(bwh.[Sales Office (act)] as NVARCHAR(MAX)) =  '4200' THEN 0
+									WHEN bwh.category = 'Machines' THEN CASE
+																		WHEN CASE
+																				WHEN bwh.area = 'MGI' THEN 'Public Sector'
+																				WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+																				WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+																				WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+																				WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+																					ELSE dd.District1
+																						END = 'IT Channel' AND bwh.Customer = 389354 THEN 0
+																		WHEN dqs.[Type] = 'NEW' THEN [Total Quantity]
+																		END
+	
+						ELSE 0
+							END AS NVARCHAR(MAX)) = '0'  THEN 'ZERO'
+			
+						END as nvarchar(MAX)) as 'ZERO CHECK' 
+				,CASE 
+					WHEN mco.[SALES DOC TO USE] is not null THEN 'Carry Over'
+						Else 'New Order'
+							END as 'Carry Over'
+				,CAST(bwh.[NET SALES] as decimal(10,2)) * CASE WHEN sd.Defer is NULL Then 0 ELSE sd.Defer END as [Sol Def]
+				,CAST(bwh.[NET SALES] as decimal(10,2))-(CAST(bwh.[NET SALES] as decimal(10,2))*sd.Defer) as [Sol Total]
+				,((CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(CASE WHEN bwh.[SD GS Others] IS NULL THEN 0.00 ELSE CAST(bwh.[SD GS Others] as decimal(10,2)) END as decimal(10,2))) * CASE WHEN R.AMOUNT is null THEN 0 ELSE R.AMOUNT END ) as Rebate_Amount
+				,CASE
+					WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+					WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+					WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+					WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medical'
+					WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+					WHEN area = 'BGB Dealer sales' then 'Indirect'
+					WHEN Area = 'BGB Mass Merchand.' THEN 'Service'
+						ELSE 'Other'
+							END as CRM_Business_Unit
+				,CASE
+					WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Area_CRM
+					WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Area_CRM
+					WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'MGI'
+					WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN Null
+					WHEN busc.[Business Unit]  is not null then busc.Sales_Area_CRM
+					WHEN area = 'BGB Dealer sales' then Null
+					WHEN Area = 'BGB Mass Merchand.' THEN 'Service'
+						ELSE 'Other'
+							END as CRM_Sales_Area
+				,CASE
+					WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_District_CRM
+					WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_District_CRM
+					WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Private'
+					WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medical'
+					WHEN busc.[Business Unit]  is not null then busc.Sales_District_CRM
+					WHEN area = 'BGB Dealer sales' then 'Private'
+					WHEN Area = 'BGB Mass Merchand.' THEN 'Service'
+						ELSE 'Other'
+							END as CRM_Sales_District
+				,CASE
+					WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN NULL
+					WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Office_CRM
+					WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Office_CRM
+					WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN NULL
+					WHEN busc.[Business Unit]  is not null then busc.Sales_Office_CRM
+					WHEN area = 'BGB Dealer sales' then 'Region 1'
+					WHEN Area = 'BGB Mass Merchand.' THEN 'Service'
+						ELSE 'Other'
+							END as CRM_Sales_Office
+				,CASE
+					WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Team_CRM
+					WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Team_CRM
+							WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+					WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN NULL
+					WHEN busc.[Business Unit]  is not null then busc.Sales_Team_CRM
+					WHEN area = 'BGB Dealer sales' then 'Indirect'
+					WHEN Area = 'BGB Mass Merchand.' THEN 'Public'
+						ELSE 'Other'
+							END as CRM_Sales_Team
+				,dosm.channel
+				,dosm.region as sales_region									
+			  FROM [dsr].[BW_HARD] bwh
+			LEFT JOIN (SELECT * FROM (SELECT [Product Area], P#Area, ROW_NUMBER () over (Partition by [Product Area] order by [product area] asc) as kd FROM lup.DSR_PRODUCT_AREA_CATEGORIES) kd WHERE kd = 1) pac
+				ON pac.[Product Area] = bwh.[Product Area]
+			LEFT JOIN (SELECT * FROM (SELECT [Product Area], P#Area, ROW_NUMBER () over (Partition by [Product Area] order by [product area] asc) as kd FROM lup.DSR_PRODUCT_AREA_CATEGORIES) kd WHERE kd = 1) pac2
+				ON pac2.[Product Area] = bwh.[Product hier#lev# 1]
+			LEFT JOIN lup.DSR_COMPANY_CODES dcc
+				ON dcc.[Sales Office] = bwh.[Sales Office (act)]
+			LEFT JOIN lup.DSR_SCA_CUSTOMER_LIST dscl
+				ON dscl.[SCA No] = bwh.Customer
+			LEFT JOIN lup.DSR_DISTRICTS dd
+				ON dd.District = bwh.[Sales District (act)]
+			LEFT JOIN lup.DSR_SALES_LEVELS dsl
+				ON dsl.[Sales Level 5] = bwh.[Sales District (act)]
+			LEFT JOIN lup.DSR_QUALITY_STANDARD dqs
+				ON dqs.[Quality Standard] = bwh.[name]
+			LEFT JOIN lup.DSR_DEALER_BRANCH ddb
+				ON ddb.[Sales District] = bwh.[Sales District (act)]
+			LEFT JOIN (SELECT [sales doc TO USE], sum(Amount) as Amount from #CARRYOVER group by [SALES DOC TO USE] ) mco
+				ON bwh.[Sales document] = mco.[SALES DOC TO USE]
+			LEFT JOIN (SELECT * FROM (SELECT *, ROW_NUMBER () OVER (PARTITION BY [Main Material] ORDER BY [Main Material]) kd FROM lup.DSR_SOLUTION_DEFERRAL) kd WHERE kd = 1 ) sd
+				ON sd.[Main Material] = bwh.Material
+			LEFT JOIN (SELECT [2nd Order], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM FROM #obformat WHERE [2nd Order] not like '%#%' GROUP BY [2nd Order], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM ) obf1
+				ON obf1.[2nd Order] = bwh.[Sales document]
+			LEFT JOIN (SELECT [Sales document], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM FROM #obformat WHERE [Sales document] not like '%#%' GROUP BY [Sales document], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM) obf2
+				ON obf2.[Sales document] = bwh.[Sales document]
+			LEFT JOIN lup.SALES_OFFICE_MEANING so
+				on CAST(so.code as nvarchar(max)) = CAST(bwh.[Sales Office (act)] as nvarchar(max))
+			LEFT JOIN [lup].[CRM_BUSINESS_UNITS_FROM_SAP_CODES] busc
+				on busc.Code = bwh.[Sales District (act)]+Area+bwh.[Sales group (act)]
+			LEFT JOIN [lup].[CRM_BUSINESS_UNITS_FROM_SAP_CODES] busc2
+				on busc2.Code = bwh.[Sales District (act)]
+			LEFT JOIN #REBATES r
+				on RTRIM(LTRIM(r.[Customer Number])) = RTRIM(LTRIM(bwh.Customer)) and
+				 RTRIM(LTRIM(r.[Rebate])) = RTRIM(LTRIM(bwh.[Category]))
+			LEFT JOIN [lup].[DSR_OLD_STYLE_MAPPING] dosm
+				on LTRIM(RTRIM(dosm.[Mapping Key])) = 'Hard'+LTRIM(RTRIM([Sales District (act)]))+LTRIM(RTRIM(Area))+LTRIM(RTRIM(bwh.[Sales group (act)]))
+			LEFT JOIN lup.DSR_ORDERBOOK_PRODUCT_CODE_MAPPING opcm
+				on opcm.[Product Key] = bwh.[Product Area]+CASE WHEN [Product hier#lev# 1] is null THEN '' ELSE [Product hier#lev# 1] END
+			UNION ALL
+			SELECT bwh.[Company Code]
+				  ,bwh.[Distribution channel]
+				  ,[Costelement]
+				  ,so.meaning as [Sales Office (act)]
+				  ,[Area]
+				  ,[Sales District (act)]
+				  ,[Sales group (act)]
+				  ,bwh.[Product Area]
+				  ,[Material group (act)]
+				  ,[Category]
+				  ,bwh.[Customer Name]
+				  ,bwh.[Customer Name]
+				  ,bwh.[Sales document]
+				  ,[Product hier#lev# 6]
+				  ,bwh.[Quality Standard]
+				  ,Category as [Name]
+				  ,bwh.[Product hier#lev# 1]
+				  ,[Maintenance Plant]
+				  ,'BW NON HARD' as [Material]
+				  ,[NET SALES]
+				  ,[SD GS Others]
+				  ,[Rental Quantity1] as [Total Quantity2]
+				  ,[NET SALES1]
+				  ,[Rental Quantity] as [Total Quantity]
+				  ,'Actual' as Information
+				  ,CASE WHEN dosm.[Hard / Non Hard] IS NULL then 'Hard' ELSE dosm.[Hard / Non Hard] END as Hard_Non_Hard
+				  ,opcm.[Prod Area] as [P.Area]
+				,CASE
+					WHEN bwh.[Sales Office (act)] = '#' THEN bwh.[Company Code]
+						ELSE dcc.[Company Code]	
+							END as Company
+				,CASE
+					WHEN bwh.area = 'MGI' THEN 'Public Sector'
+					WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+					WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+					WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+					WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+						ELSE dd.District1
+							END as OLD_DSR_SALES_CHANNEL
+				,CASE
+					WHEN bwh.[Sales District (act)] = 'Aberdeen' THEN 'Aberdeen'
+					WHEN CASE
+								WHEN bwh.area = 'MGI' THEN 'Public Sector'
+								WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+								WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+								WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+								WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+									ELSE dd.District1
+										END = 'IT Channel' AND bwh.[Distribution channel] = 24 THEN 'Other'
+						ELSE dsl.[ENT/SME]
+							END as [Region]
+						,CASE
+							WHEN bwh.[Sales Office (act)] = '4200' THEN 0 
+							else (CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(CASE WHEN bwh.[SD GS Others] IS NULL THEN 0.00 ELSE CAST(bwh.[SD GS Others] as decimal(10,2)) END as decimal(10,2)))  - 
+										((CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(CASE WHEN bwh.[SD GS Others] IS NULL THEN 0.00 ELSE CAST(bwh.[SD GS Others] as decimal(10,2)) END as decimal(10,2))) * CASE WHEN R.AMOUNT is null THEN 0 ELSE R.AMOUNT END ) - 
+													((CAST(bwh.[NET SALES] as decimal(10,2)) * CASE WHEN sd.Defer is NULL Then 0 ELSE sd.Defer END))
+						END as [Amount (£)]
+				,dqs.[Type] as Quality_Standard
+				,CASE 
+					WHEN CAST(bwh.[Sales Office (act)] as NVARCHAR(MAX)) =  '4200' THEN 0
+					WHEN bwh.category = 'Machines' THEN CASE
+																		WHEN CASE
+																				WHEN bwh.area = 'MGI' THEN 'Public Sector'
+																				WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+																				WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+																				WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+																				WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+																					ELSE dd.District1
+																						END = 'IT Channel' AND bwh.[Customer Name]= 389354 THEN 0
+																		WHEN dqs.[Type] = 'NEW' THEN [Rental Quantity]
+																		END
+		
+						ELSE 0
+							END as Units
+				,CASE
+					WHEN CAST(bwh.[Sales Office (act)] as NVARCHAR(MAX)) = '4200' THEN ''
+						Else CASE	
+								WHEN 
+									CASE
+										WHEN bwh.area = 'MGI' THEN 'Public Sector'
+										WHEN dscl.[SCA Customer] is not null THEN 'SCA'
+										WHEN bwh.[Distribution channel] = '20' THEN 'Dealer'
+										WHEN bwh.[Material group (act)] = 'Rental and Service' THEN 'Rental'
+										WHEN bwh.[Distribution channel] = '21' THEN 'IT Channel'
+											ELSE dd.District1
+												END = 'Dealer' THEN ddb.Branch
+								END
+						END as 'Area2'
+					,	'' as 'ZERO CHECK'
+				,CASE 
+					WHEN mco.[SALES DOC TO USE] is not null THEN 'Carry Over'
+						Else 'New Order'
+							END as 'Carry Over'
+				,'' as [Sol Def]
+				,'' as [Sol Total]
+				,((CAST(bwh.[NET SALES] as decimal(10,2)) - CAST(CASE WHEN bwh.[SD GS Others] IS NULL THEN 0.00 ELSE CAST(bwh.[SD GS Others] as decimal(10,2)) END as decimal(10,2))) * CASE WHEN R.AMOUNT is null THEN 0 ELSE R.AMOUNT END ) as Rebate_Amount
+				,CASE WHEN CASE 
+							WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+							WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+							WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+							WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+							WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+							WHEN area = 'BGB Dealer sales' then 'Indirect'
+							WHEN area = 'BGB Dealer service' then 'Indirect'
+								ELSE 'Other'
+									END <> 'Indirect' THEN 'Service'
+						ELSE CASE
+					WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+					WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+					WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+					WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+					WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+					WHEN area = 'BGB Dealer sales' then 'Indirect'
+					WHEN area = 'BGB Dealer service' then 'Indirect'
+					WHEN Area = 'BGB Mass Merchand.' THEN 'Service'
+						ELSE 'Other'
+							END END  as CRM_Business_Unit
+				,CASE WHEN CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+								WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+								WHEN area = 'BGB Dealer sales' then 'Indirect'
+								WHEN area = 'BGB Dealer service' then 'Indirect'
+									ELSE 'Other'
+										END <> 'Indirect' THEN CASE
+																	WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Team_CRM
+																	WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Team_CRM
+																	WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+																	WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+																	WHEN busc.[Business Unit]  is not null then busc.Sales_Team_CRM
+																	WHEN area = 'BGB Dealer sales' then ''
+																	WHEN area = 'BGB Dealer service' then ''
+																	WHEN Area = 'BGB Mass Merchand.' THEN 'Public'
+																	 ELSE 'Other' END
+						ELSE CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Area_CRM
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Area_CRM
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN NULL
+								WHEN busc.[Business Unit] is not null then busc.Sales_Area_CRM
+								WHEN area = 'BGB Dealer sales' then NULL
+								WHEN area = 'BGB Dealer service' then NULL
+								WHEN Area = 'BGB Mass Merchand.' THEN 'Mass Merchandise'
+									ELSE 'Public'
+										END END  as CRM_Sales_Area
+				,CASE WHEN CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+								WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+								WHEN area = 'BGB Dealer sales' then 'Indirect'
+								WHEN area = 'BGB Dealer service' then 'Indirect'
+									ELSE 'Other'
+										END <> 'Indirect' THEN 'Service'
+						ELSE CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_District_CRM
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_District_CRM
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Private'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+								WHEN busc.[Business Unit]  is not null then busc.Sales_District_CRM
+								WHEN area = 'BGB Dealer sales' then 'Private'
+								WHEN area = 'BGB Dealer service' then 'Private'
+								WHEN Area = 'BGB Mass Merchand.' THEN 'Service'
+									ELSE 'Other'
+										END END as CRM_Sales_District
+					,CASE WHEN CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+								WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+								WHEN area = 'BGB Dealer sales' then 'Indirect'
+								WHEN area = 'BGB Dealer service' then 'Indirect'
+									ELSE 'Other'
+										END <> 'Indirect' THEN CASE
+																	WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Area_CRM
+																	WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Area_CRM
+																	WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'MGI'
+																	WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+																	WHEN busc.[Business Unit]  is not null then busc.Sales_Area_CRM
+																	WHEN area = 'BGB Dealer sales' then ''
+																	WHEN area = 'BGB Dealer service' then ''
+																	WHEN Area = 'BGB Mass Merchand.' THEN 'Public'
+																	 ELSE 'check' END 
+						ELSE CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Office_CRM
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Office_CRM
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'MGI'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN NULL
+								WHEN busc.[Business Unit] is not null then busc.Sales_Office_CRM
+								WHEN area = 'BGB Dealer sales' then 'Region 1'
+								WHEN area = 'BGB Dealer service' then 'Region 1'
+								WHEN Area = 'BGB Mass Merchand.' THEN 'Mass Merchandise'
+									ELSE 'Public'
+										END END  as CRM_Sales_Office
+				,CASE WHEN CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.[Business Unit]
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.[Business Unit]
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+								WHEN busc.[Business Unit] is not null then busc.[Business Unit]
+								WHEN area = 'BGB Dealer sales' then 'Indirect'
+								WHEN area = 'BGB Dealer service' then 'Indirect'
+									ELSE 'Other'
+										END <> 'Indirect' THEN CASE
+																	WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_District_CRM
+																	WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_District_CRM
+																	WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Private'
+																	WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN 'Medicial'
+																	WHEN busc.[Business Unit]  is not null then busc.Sales_District_CRM
+																	WHEN area = 'BGB Dealer sales' then ''
+																	WHEN area = 'BGB Dealer service' then ''
+																	WHEN Area = 'BGB Mass Merchand.' THEN 'Public'
+																	 ELSE 'check' END
+						ELSE CASE
+								WHEN obf1.[2nd Order] IS NOT NULL THEN obf1.Sales_Team_CRM
+								WHEN obf2.[Sales document] IS NOT NULL THEN obf2.Sales_Team_CRM
+								WHEN bwh.[Product hier#lev# 1] = 'Industrial Printer - MGI' THEN 'Industrial Print'
+								WHEN bwh.[Product hier#lev# 1] = 'Healthcare' THEN NULL
+								WHEN busc.[Business Unit] is not null then busc.Sales_Team_CRM
+								WHEN area = 'BGB Dealer sales' then 'Indirect'
+								WHEN area = 'BGB Dealer service' then 'Indirect'
+								WHEN Area = 'BGB Mass Merchand.' THEN 'Mass Merchandise'
+									ELSE 'Public'
+										END END  as CRM_Sales_Team
+				,dosm.Channel
+				,CASE WHEN (LTRIM(RTRIM(bwh.[Type])) = 'Spare Parts') and (LTRIM(RTRIM(dosm.channel)) = 'Dealer') THEN 'Spare Parts' 
+					ELSE dosm.Region END as sales_region										
+			  FROM [dsr].[BW_NON_HARD] bwh
+			LEFT JOIN (SELECT * FROM (SELECT [Product Area], P#Area, ROW_NUMBER () over (Partition by [Product Area] order by [product area] asc) as kd FROM lup.DSR_PRODUCT_AREA_CATEGORIES) kd WHERE kd = 1) pac
+				ON pac.[Product Area] = bwh.[Product Area]
+			LEFT JOIN (SELECT * FROM (SELECT [Product Area], P#Area, ROW_NUMBER () over (Partition by [Product Area] order by [product area] asc) as kd FROM lup.DSR_PRODUCT_AREA_CATEGORIES) kd WHERE kd = 1) pac2
+				ON pac2.[Product Area] = bwh.[Product hier#lev# 1]
+			LEFT JOIN lup.DSR_COMPANY_CODES dcc
+				ON dcc.[Sales Office] = bwh.[Sales Office (act)]
+			LEFT JOIN lup.DSR_SCA_CUSTOMER_LIST dscl
+				ON dscl.[SCA No] = bwh.[Customer Name]
+			LEFT JOIN lup.DSR_DISTRICTS dd
+				ON dd.District = bwh.[Sales District (act)]
+			LEFT JOIN lup.DSR_SALES_LEVELS dsl
+				ON dsl.[Sales Level 5] = bwh.[Sales District (act)]
+			LEFT JOIN lup.DSR_QUALITY_STANDARD dqs
+				ON dqs.[Quality Standard] = bwh.[Category]
+			LEFT JOIN lup.DSR_DEALER_BRANCH ddb
+				ON ddb.[Sales District] = bwh.[Sales District (act)]
+			LEFT JOIN (SELECT [SALES DOC TO USE]  FROM #CARRYOVER GROUP BY [SALES DOC TO USE] )  mco
+				ON bwh.[Sales document] = mco.[SALES DOC TO USE]
+			LEFT JOIN (SELECT [2nd Order], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [2nd Order] not like '%#%' GROUP BY [2nd Order], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM) obf1
+				ON obf1.[2nd Order] = bwh.[Sales document]
+			LEFT JOIN lup.SALES_OFFICE_MEANING so
+				on CAST(so.code as nvarchar(max)) = CAST(bwh.[Sales Office (act)] as nvarchar(max))
+			LEFT JOIN (SELECT [Sales document], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Sales document] not like '%#%' GROUP BY [Sales document], [Business Unit], Sales_Area_CRM, Sales_District_CRM, Sales_Office_CRM, Sales_Team_CRM) obf2
+				ON obf2.[Sales document] = bwh.[Sales document]
+			LEFT JOIN [lup].[CRM_BUSINESS_UNITS_FROM_SAP_CODES] busc
+				on busc.Code = bwh.[Sales District (act)]+Area+bwh.[Sales group (act)]
+			LEFT JOIN [lup].[CRM_BUSINESS_UNITS_FROM_SAP_CODES] busc2
+				on busc2.Code = bwh.[Sales District (act)]	
+			LEFT JOIN (SELECT * FROM (SELECT *, ROW_NUMBER () OVER (PARTITION BY [Main Material] ORDER BY [Main Material]) kd FROM lup.DSR_SOLUTION_DEFERRAL) kd WHERE kd = 1 ) sd
+				ON sd.[Main Material] = bwh.[Material group (act)]
+			LEFT JOIN #REBATES r
+				on RTRIM(LTRIM(r.[Customer Number])) = RTRIM(LTRIM(bwh.[Customer Number])) and
+				 RTRIM(LTRIM(r.[Rebate])) = RTRIM(LTRIM(bwh.[Type]))
+			LEFT JOIN [lup].[DSR_OLD_STYLE_MAPPING] dosm
+				on LTRIM(RTRIM(dosm.[Mapping Key])) = 'Non Hard'+LTRIM(RTRIM([Sales District (act)]))+LTRIM(RTRIM(Area))+LTRIM(RTRIM(bwh.[Sales group (act)]))
+			LEFT JOIN lup.DSR_ORDERBOOK_PRODUCT_CODE_MAPPING opcm
+				on opcm.[Product Key] = bwh.[Product Area]+[Product hier#lev# 1]+[Product hier#lev# 11]) as tmp
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_ERROR_REPORT This is the formatting of the order book for the error report
+-----------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM dsr.FDT_ORDERBOOK_ERROR_REPORT
+INSERT INTO dsr.FDT_ORDERBOOK_ERROR_REPORT
+
+
+
+SELECT 	 
+	  [Sales document]
+      ,[Customer Name]
+      ,[Sales Person Name]
+      ,[Shipping status]
+      ,[Main Material]
+      ,[Equipment]
+      ,[Postal Code (Equipme]
+      ,[District] as [Orderbook District]
+	  ,spfer.[District                   (Sales District)] as [Check District]
+	  ,spfer.[Branch                    (Sales group)] as [Check Group]
+      ,[Office]
+      ,[group] as [Orderbook Group]
+      ,[Framework Partner]
+      ,[Leasing type]
+      ,[Calendar Year/Month]
+      ,[Total Revenue]
+      ,[Lease Settlement]
+      ,[Revenue Salesperson]
+      ,[Deduction]
+      ,[Commissionable Revenue]
+      ,[Honours Club Adjust#]
+      ,[Sales Base]
+      ,[Calc# Salesperson GP]
+      ,[Revenue Region]
+      ,[ITP Price]
+      ,[Region GP]
+      ,[Sales quantity]
+	 ,[Business Unit]
+	 ,[Distribution Channel]
+	 ,Error_In_Name
+	 ,[SALES DISTRICT ERROR]
+	 ,[SALES GROUP ERROR]
+	 ,[No CRM Quote ID]
+	 ,[No framework partner]
+	 ,[Salesmand not assigned]
+	 ,[Error Check]
+	 ,[Document Date]
+	 ,username
+FROM #obformat
+left join lup.DSR_SALES_PERSON_FOR_ERROR_REPORT spfer
+	ON SPFER.[Sales person] = [Sales Person Name]
+WHERE [Error Check] = 'Error'
+AND Exclude <> 'Exclude'
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_TELESALES This is the formatting of the order book for telesales
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+DELETE FROM dsr.FDT_ORDERBOOK_TELESALES
+INSERT INTO dsr.FDT_ORDERBOOK_TELESALES
+
+
+SELECT 
+	 [Sales document]
+	 ,Equipment
+	 ,[Main Material]
+	 ,[Customer Name]
+	 ,[Consignee Name]
+	 ,[Postal Code (Equipme] as [Postcode]
+	 ,Channel as [DSR Channel]
+	 ,Region as [DSR Branch]
+	 ,District as [BW Sales District]
+	 ,Office as [BW Sales Office]
+	 ,[Group] as [BW Sales Group]
+     ,[Sales Person Name] As [Sales Person]
+	 ,[Linking Pin Falcon] as [CRM Quote ID]
+	 ,[Your Reference]
+	 ,[Product hier#lev# 1 name] as [Product Hierarchy Level 1]
+	 ,[Product area name] as [Product Area]
+	 ,[Customer condition G]
+	 ,[Shipping status]
+	 ,[Leasing type]
+	 ,[Document Date]
+	 ,[Calendar Year/Month]
+      ,[Total Revenue]
+      ,[Lease Settlement]
+      ,[Revenue Salesperson]
+      ,[Deduction]
+      ,[Commissionable Revenue]
+      ,[Honours Club Adjust#]
+      ,[Sales Base]
+      ,[Calc# Salesperson GP]
+      ,[Revenue Region]
+      ,[ITP Price]
+      ,[Region GP]
+      ,[Sales quantity]
+      ,[Product Area Category]
+FROM dsr.FDT_ORDERBOOK_FORMATTED ob
+WHERE  Exclude <> 'Exclude'
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_FINAL This is the order book in its final formatting
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+DELETE FROM dsr.FDT_ORDERBOOK_FINAL
+INSERT INTO dsr.FDT_ORDERBOOK_FINAL
+
+
+SELECT
+      [District]
+      ,[Calendar Year/Month]
+      ,[Group]
+      ,[Office]
+      ,[Sales Person Name]
+	  ,[Sales document]
+      ,[Linking Pin Falcon]
+      ,[Main Material]
+      ,[Product hier#lev# 1 name]
+      ,[Product area name]
+      ,[Customer condition G]
+      ,[Customer Name]
+      ,[Consignee Name]
+      ,[Material group name]
+      ,[Leasing Company]
+      ,[Postal Code (Equipme]
+      ,[Shipping status]
+      ,[Leasing type]
+      ,[Document Date]
+      ,[Total Revenue]
+      ,[Lease Settlement]
+      ,[Revenue Salesperson]
+      ,[Calc# Salesperson GP]
+      ,[Revenue Region]
+      ,[Region GP]
+      ,[Sales quantity]
+      ,[PP_Deal]
+FROM dsr.FDT_ORDERBOOK_FORMATTED
+WHERE [Sales quantity] > 0
+	AND Exclude <> 'Exclude'
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#RENTALCHECK This is the Rentals in the OB
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+SELECT
+	Sales_District_CRM
+	,Sales_Office_CRM
+	,Sales_Team_CRM
+	,[Customer Name]
+	,SUM(Units) as [SUM of Units]
+	,CASE
+		WHEN SUM(Units) >1 THEN 1
+		WHEN SUM(Units) <-1 THEN 1
+			ELSE 0
+				END as 'ZERO Filter'
+INTO #RENTALCHECK
+FROM dsr.FDT_ORDERBOOK_FORMATTED
+WHERE [Leasing type] = 'Rental'
+GROUP BY 
+	Sales_District_CRM
+	,Sales_Office_CRM
+	,Sales_Team_CRM
+	,[Customer Name]
+	,Units
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_BW_DEALER_SUMMARY This is the summary of the dealer data
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_BW_DEALER_SUMMARY
+INSERT INTO dsr.FDT_BW_DEALER_SUMMARY
+
+SELECT
+	[Company Code]
+	,[Distribution channel]
+	,Costelement
+	,[Sales Office (act)]
+	,Area
+	,[Sales District (act)]
+	,[Sales group (act)]
+	,[Product Area]
+	,[Material group (act)]
+	,Category
+	,Customer
+	,[Customer Name]
+	,[Sales document]
+	,[Product hier#lev# 6]
+	,[Quality Standard]
+	,[Name]
+	,[Product hier#lev# 1]
+	,[Maintenance Plant]
+	,Material
+	,'' as Blank
+	,'' as Blank1
+	,[NET SALES]
+	,[SD GS Others]
+	,[Total Quantity2]
+	,[NET SALES1]
+	,[Total Quantity]
+	,Information
+	,Hard_Non_Hard
+	,[P.Area]
+	,Company
+	,OLD_DSR_SALES_CHANNEL
+	,Region
+	,[Amount (£)]
+	,Quality_Standard
+	,Units
+	,Area2
+	,[ZERO CHECK]
+	,[Carry Over]
+	,[Sol Def]
+	,[Sol Total]
+	,CRM_Sales_Area
+	,CRM_Sales_District
+	,CRM_Sales_Office
+	,CRM_Sales_Team
+FROM dsr.FDT_BW_FORMATTED
+WHERE OLD_DSR_SALES_CHANNEL = 'DEALER'
+	AND Area <> ''
+	AND [ZERO CHECK] NOT LIKE 'ZERO'
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#PREPFORWF Creates the prep file (combined order book and bw) for the working file
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.PREPFORWF
+INSERT INTO dsr.PREPFORWF
+
+SELECT *  FROM (
+				SELECT
+					'BW' as [Report Name] 
+					,[Sales document]
+					,[Customer Name]
+					,'' as [2nd Order]
+					,'' as [Sales Person]
+					,'' as [Sales Person Name]
+					,'Shipped' as [Shipping status]
+					,[Customer Name] as [Consignee Name]
+					,[Material] as [Main Material]
+					,'' as [Equipment]
+					,'' as [Postal Code (Equipme]
+					,@MONTH as [Calendar Year/Month]
+					,[NET SALES] as [Total Revenue]
+					 ,[P.Area] as [Product Area Category]
+					 ,'BW '+ [P.Area] as Report_Category
+					 ,[Carry Over]
+					 ,CRM_Business_Unit as [Business Unit]
+					 ,CRM_Sales_Area as Sales_Area_CRM
+					 ,CRM_Sales_District as Sales_District_CRM
+					 ,CRM_Sales_Office as Sales_Office_CRM
+					 ,CRM_Sales_Team as Sales_Team_CRM
+					 ,[Total Quantity]
+				FROM dsr.FDT_BW_FORMATTED
+				) kd
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#WORKINGFILEREVENUE Creates a PIVOT table of the data from ob, bw and budgets
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+
+
+
+
+DELETE FROM dsr.FDT_WORKING_FILE_REVENUE_ALL
+INSERT INTO dsr.FDT_WORKING_FILE_REVENUE_ALL
+
+
+
+SELECT *  FROM (SELECT
+	[Business Unit]
+	,Sales_District_CRM
+	,Sales_Team_CRM
+	,Sales_Office_CRM
+	,Sales_Area_CRM
+	,[Report_Category]
+	,[Total Revenue]
+FROM  dsr.PREPFORWF)  as kd
+PIVOT (SUM([Total Revenue])
+	FOR [Report_Category]
+		IN
+		([BW Sol],[BW A3],[BW A4],[BW PP])) as PIVOTTABLE
+
+
+
+
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--#WORKINGFILEUNIT Creates a PIVOT table of the data from ob, bw and budgets
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_WORKING_FILE_UNITS_ALL
+INSERT INTO dsr.FDT_WORKING_FILE_UNITS_ALL
+
+
+
+SELECT * FROM (SELECT
+	[Business Unit]
+	,Sales_District_CRM
+	,Sales_Team_CRM
+	,Sales_Office_CRM
+	,Sales_Area_CRM
+	,[Report_Category]
+	,[Total Quantity]
+FROM dsr.PREPFORWF)  as kd
+PIVOT (SUM([Total Quantity])
+	FOR [Report_Category]
+		IN
+		([BW Sol],[BW A3],[BW A4],[BW PP]
+		)) as PIVOTTABLE
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------- 
+----dsr.FDT_WORKING_FILE_REVENUE_NEW_ORDERS Creates a PIVOT table of the data from bw showing New Orders
+-------------------------------------------------------------------------------------------------------------------------------------------------`
+
+
+
+
+
+DELETE FROM dsr.FDT_WORKING_FILE_REVENUE_NEW_ORDERS
+INSERT INTO dsr.FDT_WORKING_FILE_REVENUE_NEW_ORDERS
+
+
+
+SELECT * FROM (SELECT
+	[Business Unit]
+	,Sales_District_CRM
+	,Sales_Team_CRM
+	,Sales_Office_CRM
+	,Sales_Area_CRM
+	,[Report_Category]
+	,[Total Revenue]
+FROM  dsr.PREPFORWF
+WHERE [Carry Over] = 'New Order')  as kd
+PIVOT (SUM([Total Revenue])
+	FOR [Report_Category]
+		IN
+		([BW Sol],[BW A3],[BW A4],[BW PP])) as PIVOTTABLE
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------- 
+----#WORKINGFILEUNIT Creates a PIVOT table of the data from ob, bw and budgets
+-------------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_WORKING_FILE_UNITS_NEW_ORDERS
+INSERT INTO dsr.FDT_WORKING_FILE_UNITS_NEW_ORDERS
+
+
+
+SELECT *  FROM (SELECT
+	[Business Unit]
+	,Sales_District_CRM
+	,Sales_Team_CRM
+	,Sales_Office_CRM
+	,Sales_Area_CRM
+	,[Report_Category]
+	,[Total Quantity]
+FROM dsr.PREPFORWF WHERE [Carry Over] = 'New Order')  as kd
+PIVOT (SUM([Total Quantity])
+	FOR [Report_Category]
+		IN
+		([BW Sol],[BW A3],[BW A4],[BW PP]
+		)) as PIVOTTABLE
+
+-------------------------------------------------------------------------------------------------------------------------------------------------- 
+----#WORKINGFILEREVENUE Creates a PIVOT table of the data from ob, bw and budgets
+-------------------------------------------------------------------------------------------------------------------------------------------------`
+
+
+
+
+
+DELETE FROM dsr.FDT_WORKING_FILE_REVENUE_Carry_Over
+INSERT INTO dsr.FDT_WORKING_FILE_REVENUE_Carry_Over
+
+
+
+SELECT *  FROM (SELECT
+	[Business Unit]
+	,Sales_District_CRM
+	,Sales_Team_CRM
+	,Sales_Office_CRM
+	,Sales_Area_CRM
+	,[Report_Category]
+	,[Total Revenue]
+FROM  dsr.PREPFORWF WHERE [Carry Over] = 'Carry Over')  as kd
+PIVOT (SUM([Total Revenue])
+	FOR [Report_Category]
+		IN
+		([BW Sol],[BW A3],[BW A4],[BW PP])) as PIVOTTABLE
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------- 
+----#WORKINGFILEUNIT Creates a PIVOT table of the data from ob, bw and budgets
+-------------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_WORKING_FILE_UNITS_CARRY_OVER
+INSERT INTO dsr.FDT_WORKING_FILE_UNITS_CARRY_OVER
+
+
+SELECT *  FROM (SELECT
+	[Business Unit]
+	,Sales_District_CRM
+	,Sales_Team_CRM
+	,Sales_Office_CRM
+	,Sales_Area_CRM
+	,[Report_Category]
+	,[Total Quantity]
+FROM dsr.PREPFORWF where [Carry Over] = 'Carry Over')  as kd
+PIVOT (SUM([Total Quantity])
+	FOR [Report_Category]
+		IN
+		([BW Sol],[BW A3],[BW A4],[BW PP]
+		)) as PIVOTTAB
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.DSR_OUTPUT_OLD_MAPPING - This creates the final DSR output
+-----------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM dsr.DSR_OUTPUT_OLD_MAPPING
+insert into dsr.DSR_OUTPUT_OLD_MAPPING
+
+
+SELECT *   FROM
+(SELECT
+	'Orderbook' as [Report]
+	,[Hard / Non Hard]
+	,[Carry Over]
+	,[Sales document]
+	,[Customer Name]
+	,[Postal Code (Equipme] as [Customer Post Code]
+	,[Shipping status] as [Shipping Status]
+	,[Sales Person Name] as [Sales Person]
+	,[Main Material]
+	,[Product area name]
+	,[Product Area Category]
+	,[Product hier#lev# 1 name] as [Product Hierarchy]
+	,[Material group name]
+	,[Total Revenue]
+	,[Revenue Region]
+	,[Sol Deferral]
+	,[Rev region less Sol defer] as [Revenue adjusted]
+	,Units
+	,ltrim(rtrim([Business Unit])) as [Business Unit]
+	,ltrim(rtrim(Sales_Area_CRM)) as Sales_Area_CRM
+	,ltrim(rtrim(Sales_District_CRM)) as Sales_District_CRM
+	,ltrim(rtrim(Sales_Office_CRM)) as Sales_Office_CRM
+	,ltrim(rtrim(Sales_Team_CRM)) as Sales_Team_CRM
+	,Channel
+	,Region
+FROM dsr.FDT_ORDERBOOK_FORMATTED
+WHERE [Sales quantity] > 0 
+	AND Exclude <> 'Exclude'
+UNION ALL
+SELECT
+	'Actual' as [Report]
+	,Hard_Non_Hard as [Hard / Non Hard]
+	,[Carry Over] as [Carry Over]
+	,[Sales document]
+	,[Customer Name] as [Customer Name]
+	,'' as [Customer Post Code]
+	,'Actual' as [Shipping Status]
+	,'' as [Sales Person]
+	,Material as [Main Material]
+	,[Product Area] as [Product area name]
+	,[P.Area] as [Product Area Category]
+	,[Product hier#lev# 1] as  [Product Hierarchy]
+	,Category as [Material group name]
+	,[NET SALES] as [Total Revenue]
+	,[NET SALES] as [Revenue Region]
+	,[Sol Def] as [Sol Deferral]
+	,[Amount (£)] as [Revenue adjusted]
+	,Units as Units
+	,ltrim(rtrim(CRM_Business_Unit)) as [Business Unit]
+	,ltrim(rtrim(CRM_Sales_Area)) as Sales_Area_CRM
+	,ltrim(rtrim(CRM_Sales_District)) as Sales_District_CRM
+	,ltrim(rtrim(CRM_Sales_Office)) as Sales_Office_CRM
+	,ltrim(rtrim(CRM_Sales_Team)) as Sales_Team_CRM
+	,Channel
+	,Sales_Region as Region
+FROM dsr.FDT_BW_FORMATTED
+UNION ALL
+SELECT
+	'Orderbook' as [Report]
+	,Hard_Non_Hard as [Hard / Non Hard]
+	,[Carry Over] as [Carry Over]
+	,[Sales document]
+	,[Customer Name] as [Customer Name]
+	,'' as [Customer Post Code]
+	,'' as [Shipping Status]
+	,'' as [Sales Person]
+	,Material as [Main Material]
+	,[Product Area] as [Product area name]
+	,[P.Area] as [Product Area Category]
+	,[Product hier#lev# 1] as  [Product Hierarchy]
+	,Category as [Material group name]
+	,[NET SALES] as [Total Revenue]
+	,[NET SALES] as [Revenue Region]
+	,[Sol Def] as [Sol Deferral]
+	,[Amount (£)] as [Revenue adjusted]
+	,Units as Units
+	,ltrim(rtrim(CRM_Business_Unit)) as [Business Unit]
+	,ltrim(rtrim(CRM_Sales_Area)) as Sales_Area_CRM
+	,ltrim(rtrim(CRM_Sales_District)) as Sales_District_CRM
+	,ltrim(rtrim(CRM_Sales_Office)) as Sales_Office_CRM
+	,ltrim(rtrim(CRM_Sales_Team)) as Sales_Team_CRM
+	,Channel as Channel
+	,Sales_Region as Region
+FROM dsr.FDT_BW_FORMATTED
+WHERE Channel = 'Dealer'
+UNION ALL
+SELECT
+	'Orderbook' as [Report]
+	,ob.[Hard / Non Hard] as [Hard / Non Hard]
+	,ob.[Carry Over] as [Carry Over]
+	,[Sales document]
+	,ob.[Customer Name] as [Customer Name]
+	,[Post Code] as [Customer Post Code]
+	,'Postponed' as [Shipping Status]
+	,pd.[Sales Person] as [Sales Person]
+	,ob.[Main Material] as [Main Material]
+	,ob.[Product area name] as [Product area name]
+	,ob.[Product Area Category] as [Product Area Category]
+	,ob.[Product hier#lev# 1 name] as [Product Hierarchy]
+	,ob.[Material group name] as [Material group name]
+	,pd.Revenue as [Total Revenue]
+	,pd.Revenue  as [Revenue Region]
+	,ob.[Sol Deferral] as [Sol Deferral]
+	,pd.Revenue  as [Revenue adjusted]
+	,0 as Units
+	,ltrim(rtrim(ob.[Business Unit])) as [Business Unit]
+	,ltrim(rtrim(ob.Sales_Area_CRM)) as Sales_Area_CRM
+	,ltrim(rtrim(ob.Sales_District_CRM)) as Sales_District_CRM
+	,ltrim(rtrim(ob.Sales_Office_CRM)) as Sales_Office_CRM
+	,ltrim(rtrim(ob.Sales_Team_CRM)) as Sales_Team_CRM
+	,doom.Channel
+	,doom.Region
+FROM dsr.POSTPONED_DELIVERIES pd
+LEFT JOIN (SELECT * FROM #OBFORMAT WHERE [Sales Document] not like '#' and [Sales Document] not like 'Overall Result') ob
+	ON ob.[Sales Document] = pd.[Order]
+LEFT JOIN lup.DSR_OLD_STYLE_MAPPING doom
+	on doom.[Mapping Key] = 'Hard'+pd.[Sales District1]+pd.Region+pd.[Sales Office]
+UNION ALL
+SELECT
+	'Orderbook' as [Report]
+	,[Hard_Non_Hard] as [Hard / Non Hard]
+	,'New Order' as [Carry Over]
+	,NULL as [Sales document]
+	,NULL as [Customer Name]
+	,'' as [Customer Post Code]
+	,'' as [Shipping Status]
+	,'' as [Sales Person]
+	,NULL as [Main Material]
+	,[Product Area] as [Product area name]
+	,[Product_Group] as [Product Area Category]
+	,[Prod hier#lev# 1 (act)] as [Product Hierarchy]
+	,[Material group] as [Material group name]
+	,[Open Value] as [Total Revenue]
+	,[Open Value] as [Revenue Region]
+	,NULL as [Sol Deferral]
+	,[Open Value] as [Revenue adjusted]
+	,Units as Units
+	,'Indirect' as [Business Unit]
+	,null as Sales_Area_CRM
+	,'Private' as Sales_District_CRM
+	,ltrim(rtrim([Sales Region])) as Sales_Office_CRM
+	,'Indirect' as Sales_Team_CRM
+	,channel as Channel
+	,sales_region as Region
+FROM dsr.FDT_ORDERBOOK_INDIRECT_FORMATTED
+UNION ALL
+SELECT
+	'Actual' as [Report]
+	,'Non Hard' as [Hard / Non Hard]
+	,'New Order' as [Carry Over]
+	,NULL as [Sales Document]
+	,'TB Adjustment' as [Customer Name]
+	,'TB Adjustment' as [Customer Post Code]
+	,'TB Adjustment' as [Shipping Status]
+	,'TB Adjustment' as [Sales Person]
+	,'TB Adjustment' as [Main Material]
+	,'TB Adjustment' as [Product area name]
+	,'A3' as [Product Area Category]
+	,'TB Adjustment' as [Product Hierarchy]
+	,'TB Adjustment' as [Material group name]
+	,NULL as [Total Revenue]
+	,NULL as [Revenue Region]
+	,NULL as [Sol Deferral]
+	,@TB as [Revenue adjusted]
+	,NULL as Units
+	,'Service' as [Business Unit]
+	,'Public' as Sales_Area_CRM
+	,'Service' as Sales_District_CRM
+	,'North' as Sales_Office_CRM
+	,'Public' as Sales_Team_CRM
+	,'Public Sector' as Channel
+	,'Service' as Region
+UNION ALL
+SELECT
+	'Orderbook' as [Report]
+	,'Hard' as [Hard / Non Hard]
+	,'New Order' as [Carry Over]
+	,CAST([Sales Document] as NVARCHAR(255)) as [Sales Document]
+	,[Customer name] as [Customer Name]
+	,'' as [Customer Post Code]
+	,'Adjustment' as [Shipping Status]
+	,[Sales Person] as [Sales Person]
+	,Material as [Main Material]
+	,'Adjustment' as [Product area name]
+	,CASE 
+		WHEN [Sales Document] = 1139961797 then 'A3' 
+		WHEN [Sales Document] = 1140242617 then 'A3'
+		WHEN [Sales Document] = 1140353788 then 'A3'
+		WHEN [Sales Document] = 1140370376 then 'A3' 
+		WHEN [Sales Document] = 1140508302 then 'A3' 
+		WHEN [Sales Document] = 1140630176 then 'A3' 
+		WHEN [Sales Document] = 1140507599 then 'A3' 
+		WHEN [Sales Document] = 1140667351 then 'A3' 
+		WHEN [Sales Document] = 31472694 then 'A3' 
+		WHEN [Sales Document] = 31829276 then 'Sol' 
+			else 'A3' 
+				end as [Product Area Category]
+	,'Adjustment' as [Product Hierarchy]
+	,'Adjustment' as [Material group name]
+	,NULL as [Total Revenue]
+	,NULL as [Revenue Region]
+	,NULL as [Sol Deferral]
+	,CAST(Amount as decimal(10,2)) as [Revenue adjusted]
+	,NULL as Units
+	,'' as [Business Unit]
+	,'' as Sales_Area_CRM
+	,'' as Sales_District_CRM
+	,'' as Sales_Office_CRM
+	,'' as Sales_Team_CRM
+	,Channel as Channel
+	,Region as Region
+	from dsr.MANUAL_ADJUSTMENT ma
+) ks
+
+--SELECT ((SELECT SUM(CAST([net SALES] as DECIMAL(10,2))) from dsr.FDT_bw_FORMATTED) - (SELECT SUM([sol def]) from dsr.FDT_bw_formatted)) 
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--DSR.FDT_DEALER_DSR_NICOLA_RELTON - This is the creation of the customer specific Dealer DSR.
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+delete from DSR.FDT_DEALER_DSR_NICOLA_RELTON where [Report_Month] = CAST(DATEADD(M, DATEDIFF(M,0, GETDATE()) -0,0) as DATE)
+insert into DSR.FDT_DEALER_DSR_NICOLA_RELTON
+
+SELECT
+	CAST(DATEADD(M, DATEDIFF(M,0,gETDATE()) -0,0) as DATE) as Report_Month
+	,[Customer Name]
+	,Category
+	,sum(cast([NET SALES1] as decimal (10,2))) as Amount
+
+			FROM (
+				SELECT 
+					   [Customer Name]
+					  ,case 
+							when [Product Hierarchy Level 2 Name] = 'Applications' THEN 'Solutions'
+							when [Product Hierarchy Level 2 Name] = 'IT Software' THEN 'Solutions'
+							when [Product Hierarchy Level 2 Name] = 'IT Managed Services' THEN 'Solutions'
+							when [Product Hierarchy Level 2 Name] = '101/Not assigned' THEN 'Consumables'
+							when [Product Hierarchy Level 2 Name] = 'Consumables (A3)' THEN 'Consumables'
+							when [Product Hierarchy Level 2 Name] = 'Spare Parts (A3)' THEN 'Spare Parts'
+							when [Product Hierarchy Level 2 Name] = 'Consumables (A4)' THEN 'Consumables'
+							when [Product Hierarchy Level 2 Name] = 'Spare parts (A4)' THEN 'Spare Parts'
+							when [Product Hierarchy Level 2 Name] = 'Machines (A3)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Accessories (A3)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Documentation (A3)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Machines (A4)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Accessories (A4)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Documentation (A4)' THEN 'Hard'
+								Else [Product Hierarchy Level 2 Name]
+									end as Category
+					  ,[NET SALES1]
+				  FROM [dsr].[BW_NON_HARD]
+				  --where [Sales document] not in (
+						--							'1061710352',
+						--							'1061710366',
+						--							'1061710510',
+						--							'1061710343',
+						--							'1061710359',
+						--							'1061710358',
+						--							'1061710365',
+						--							'1061710351',
+						--							'1061710377',
+						--							'1061710518',
+						--							'1061710342',
+						--							'1061710528',
+						--							'1061710344',
+						--							'1061710348',
+						--							'1061710360',
+						--							'1061710504',
+						--							'1061710508',
+						--							'1061710349',
+						--							'1061711604',
+						--							'1061710347',
+						--							'1061710689',
+						--							'1061710519',
+						--							'1061710500',
+						--							'1061710503',
+						--							'1061710355',
+						--							'1061710375',
+						--							'1061710353',
+						--							'1061710345',
+						--							'1061710350',
+						--							'1061710367',
+						--							'1061710509',
+						--							'1061710361',
+						--							'1061710363',
+						--							'1061710502',
+						--							'1061710515',
+						--							'1061710517',
+						--							'1061710354',
+						--							'1061710501',
+						--							'1061710505',
+						--							'1061710506',
+						--							'1061710511',
+						--							'1061710512',
+						--							'1061710513',
+						--							'1061710696',
+						--							'1061710356',
+						--							'1061710374',
+						--							'1061710530',
+						--							'1061710533',
+						--							'1061710534',
+						--							'1061710357',
+						--							'1061710370',
+						--							'1061710364',
+						--							'1061710369',
+						--							'1061710376',
+						--							'1061710507',
+						--							'1061710514',
+						--							'1061710529',
+						--							'1061710532',
+						--							'1061710362',
+						--							'1061710346',
+						--							'1061710368',
+						--							'1061710372',
+						--							'1061710371',
+						--							'1061710373',
+						--							'1061710531'
+						--						  )
+				union all
+				SELECT 
+					  [Customer Name]
+					  ,case 
+							when [Product Hierarchy Level 2 Name] = 'Applications' THEN 'Solutions'
+							when [Product Hierarchy Level 2 Name] = 'IT Software' THEN 'Solutions'
+							when [Product Hierarchy Level 2 Name] = 'IT Managed Services' THEN 'Solutions'
+							when [Product Hierarchy Level 2 Name] = '101/Not assigned' THEN 'Consumables'
+							when [Product Hierarchy Level 2 Name] = 'Consumables (A3)' THEN 'Consumables'
+							when [Product Hierarchy Level 2 Name] = 'Spare Parts (A3)' THEN 'Spare Parts'
+							when [Product Hierarchy Level 2 Name] = 'Consumables (A4)' THEN 'Consumables'
+							when [Product Hierarchy Level 2 Name] = 'Spare parts (A4)' THEN 'Spare Parts'
+							when [Product Hierarchy Level 2 Name] = 'Machines (A3)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Accessories (A3)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Documentation (A3)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Machines (A4)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Accessories (A4)' THEN 'Hard'
+							when [Product Hierarchy Level 2 Name] = 'Documentation (A4)' THEN 'Hard'
+								else [Product Hierarchy Level 2 Name]
+									End as Category
+					  ,[NET SALES1]
+				FROM [dsr].[BW_HARD]
+				--where [Sales document] not in (
+				--								'1061710352',
+				--								'1061710366',
+				--								'1061710510',
+				--								'1061710343',
+				--								'1061710359',
+				--								'1061710358',
+				--								'1061710365',
+				--								'1061710351',
+				--								'1061710377',
+				--								'1061710518',
+				--								'1061710342',
+				--								'1061710528',
+				--								'1061710344',
+				--								'1061710348',
+				--								'1061710360',
+				--								'1061710504',
+				--								'1061710508',
+				--								'1061710349',
+				--								'1061711604',
+				--								'1061710347',
+				--								'1061710689',
+				--								'1061710519',
+				--								'1061710500',
+				--								'1061710503',
+				--								'1061710355',
+				--								'1061710375',
+				--								'1061710353',
+				--								'1061710345',
+				--								'1061710350',
+				--								'1061710367',
+				--								'1061710509',
+				--								'1061710361',
+				--								'1061710363',
+				--								'1061710502',
+				--								'1061710515',
+				--								'1061710517',
+				--								'1061710354',
+				--								'1061710501',
+				--								'1061710505',
+				--								'1061710506',
+				--								'1061710511',
+				--								'1061710512',
+				--								'1061710513',
+				--								'1061710696',
+				--								'1061710356',
+				--								'1061710374',
+				--								'1061710530',
+				--								'1061710533',
+				--								'1061710534',
+				--								'1061710357',
+				--								'1061710370',
+				--								'1061710364',
+				--								'1061710369',
+				--								'1061710376',
+				--								'1061710507',
+				--								'1061710514',
+				--								'1061710529',
+				--								'1061710532',
+				--								'1061710362',
+				--								'1061710346',
+				--								'1061710368',
+				--								'1061710372',
+				--								'1061710371',
+				--								'1061710373',
+				--								'1061710531'
+				--							   )
+			   ) a
+
+where [customer name] in (
+						'MASTERCOPY OFFICE SOLUTIONS',
+						'THE SIGMA GROUP',
+						'ORKNEY OFFICE SUPPLIES LTD',
+						'CANON (UK) LIMITED',
+						'THE SIGMA GROUP',
+						'B D S COMPUTER LTD',
+						'THE DANWOOD GROUP LTD',
+						'CONNECT BUSINESS TECHNOLOGY LTD',
+						'CBE SOLUTIONS',
+						'DIGITAL NERVE CENTRE',
+						'TUDOR BUSINESS SERVICES LTD',
+						'DIGITAL COPIER SYSTEMS EASTERN LTD.',
+						'IVORY SERVICE SOLUTIONS LTD',
+						'PBS COMMUNICATIONS LIMITED',
+						'1 OFFICE EQUIPMENT LIMITED',
+						'ALTODIGITAL NETWORKS LTD',
+						'E.B.S',
+						'COPYBEST (ESSEX) LIMITED',
+						'CSL BUSINESS MACHINES LTD',
+						'ETHOS IMAGING LTD',
+						'ADVANCED IMAGING SYSTEMS LIMITED',
+						'COPY-IT LTD',
+						'GEERINGS DIGITAL LIMITED',
+						'FIRST CLASS BUSINESS SOLUTIONS LTD',
+						'PRINCIPAL 1 LTD.',
+						'TEFFONT BUSINESS SYSTEMS LTD',
+						'COPYTECH GROUP SERVICES LIMITED',
+						'CONCORDE 1 LIMITED',
+						'IT @ SPECTRUM LIMITED',
+						'CLAYTON BUSINESS MACHINES',
+						'COPYFORM',
+						'KRL GROUP LTD',
+						'COS SYSTEMS LIMITED',
+						'ETHOS COMMUNICATIONS SOLUTIONS LTD',
+						'UNITED BUSINESS MACHINES LTD',
+						'ESSEX DIGITAL COPIERS',
+						'MIDREPRO LTD',
+						'LINKMORE BUSINESS COMMUNICATIONS LT',
+						'ARC OFFICE SYSTEMS LTD',
+						'COLLATE BUSINESS SYSTEMS LTD.',
+						'REFAX SYSTEMS LIMITED',
+						'ALDERSHOT BUSINESS MACHINES LTD',
+						'LYNBROOK MANAGED SERVICES LIMITED',
+						'BUSINESS BY TECHNOLOGY LIMITED',
+						'WOODBANK OFFICE SOLUTIONS LIMITED',
+						'NCS GROUP LTD',
+						'COPYLINK DIGITAL LTD',
+						'SW DIGITAL SYSTEMS LTD',
+						'SOLUTIONS IN TECHNOLOGY LTD',
+						'CORONA BUSINESS SOLUTIONS LIMITED',
+						'HOLLY DIGITAL',
+						'APOGEE CORPORATION LTD',
+						'XEROX IBS NI LIMITED',
+						'BORDER OFFICE SUPPLIES & SYSTEMS LT',
+						'TECHNOCOPY LTD',
+						'M-PRESS IMAGING SYSTEMS',
+						'MIDSHIRE COMMUNICATIONS LTD',
+						'CORONA CORPORATE SOLUTIONS LTD',
+						'COPYLOGIC LTD',
+						'APPOINTMENT BUSINESS MACHINES LTD',
+						'EKS DIGITAL SOLUTIONS LTD',
+						'LASERLIFE   (VITESSE PLC T/A)',
+						'XPERT DIGITAL  DOC SOL (UK) LTD',
+						'INCOVO LTD',
+						'KC DIGITAL SERVICES LTD',
+						'C S DIGITAL',
+						'FAXCO MAINTENANCE LTD',
+						'DIGITAL COPIER SYSTEMS LTD',
+						'PRINCIPAL 1 LTD (Account 2)',
+						'ANNODATA LTD',
+						'MB OFFICE SYSTEMS LTD',
+						'KEELEY TRAVIS BUSINESS SOL LTD',
+						'The Copier Company Ltd',
+						'PHOTOCOPIERS DIRECT LTD',
+						'CAPITAL DOCUMENT SOLUTIONS LIMITED',
+						'SYSTEM INFORMATION TECHNOLOGY LTD',
+						'WEAVER BUSINESS MACHINES LTD',
+						'LON PHOTOCOPYING CO LTD T/A IN-DOC',
+						'M.B DIGITAL LIMITED',
+						'ARENA GROUP',
+						'AUTOMATED SYSTEMS GROUP LIMITED',
+						'OFFICE IMPRESSIONS LIMITED',
+						'FOUR DIGITAL SOLUTIONS LTD',
+						'WORKFLOW IMAGING SYSTEMS',
+						'INSIGHT SYSTEMS LTD',
+						'PULSE DIGITAL OFFICE SOLUTIONS LTD',
+						'ALPHA COPIER SERVICES LTD',
+						'BAYTEK OFFICE SOLUTIONS LTD',
+						'DATASHARP INDEPENDENT SOLUTIONS',
+						'KN SUPPLIES',
+						'AIT LTD',
+						'DIGITAL IMAGE SOLUTIONS',
+						'UK VENDING LTD',
+						'GEMINI COMMUNICATIONS',
+						'APEX DIGITAL GRAPHICS LTD',
+						'DOTS UK LTD',
+						'CONTROL PRINT SOLUTIONS LTD',
+						'ABC BUSINESS SYSTEMS LTD',
+						'ORICOM LIMITED',
+						'CITI BUSINESS SYSTEMS LTD',
+						'PENKETHS LTD',
+						'PRO COPY LTD',
+						'ITEC CONNECT LIMITED',
+						'VOHKUS LIMITED',
+						'INFLOW SOLUTIONS LTD',
+						'ARGON Office Systems Limited',
+						'CCS Media',
+						'TOUCHTEC SOLUTIONS LTD',
+						'Master-Plan Systems ltd',
+						'ESSEX BUSINESS MACHINES LTD',
+						'BLACKBOX SOLUTIONS',
+						'BECHTLE UK',
+						'RESTORE SCAN LIMITED',
+						'ELITE OFFICE SOLUTIONS',
+						'DIGITEC LIMITED',
+						'TECHNODOCS LIMITED',
+						'COPY RIGHT SYSTEM LTD',
+						'MY TOTAL OFFICE SOLUTIONS LIMITED',
+						'TYPHOON HOUSE',
+						'COMMERCIAL AND INDUSTRIAL CLEANING',
+						'COPY PRINT SOLUTIONS LIMITED',
+						'HAD-IT-LIMITED',
+						'NORTH EAST BUSINESS SYSTEMS LTD',
+						'PURE CLOUD SOLUTIONS LIMITED',
+						'ACS BUSINESS SUPPLIES',
+						'FAST TECHNOLOGY LONDON LIMITED',
+						'SMART DIGITAL BUSINESS SOLUTIONS LI',
+						'DATATECH DOCUMENT SYSTEMS LIMITED',
+						'SERVICE OFFSET SUPPLIES LIMITED',
+						'KEVIN JAMES LIMITED',
+						'MERIT PROFESSIONAL SERVICES',
+						'WESTCOAST LIMITED'
+						)
+group by 
+	[Customer Name]
+	,Category
+
+--SELECT
+--	CAST(DATEADD(M, DATEDIFF(M,0,gETDATE()) -0,0) as DATE) as Report_Month
+--	,[Sales document]
+--	,[Customer Name]
+--	,Category
+--	,sum(cast([NET SALES1] as decimal (10,2))) as Amount
+
+--			FROM (
+--				SELECT 
+--						[Sales document]
+--					   ,[Customer Name]
+--					  ,case 
+--							when [Product Hierarchy Level 2 Name] = 'Applications' THEN 'Solutions'
+--							when [Product Hierarchy Level 2 Name] = 'IT Software' THEN 'Solutions'
+--							when [Product Hierarchy Level 2 Name] = 'IT Managed Services' THEN 'Solutions'
+--							when [Product Hierarchy Level 2 Name] = '101/Not assigned' THEN 'Consumables'
+--							when [Product Hierarchy Level 2 Name] = 'Consumables (A3)' THEN 'Consumables'
+--							when [Product Hierarchy Level 2 Name] = 'Spare Parts (A3)' THEN 'Spare Parts'
+--							when [Product Hierarchy Level 2 Name] = 'Consumables (A4)' THEN 'Consumables'
+--							when [Product Hierarchy Level 2 Name] = 'Spare parts (A4)' THEN 'Spare Parts'
+--							when [Product Hierarchy Level 2 Name] = 'Machines (A3)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Accessories (A3)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Documentation (A3)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Machines (A4)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Accessories (A4)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Documentation (A4)' THEN 'Hard'
+--								Else [Product Hierarchy Level 2 Name]
+--									end as Category
+--					  ,cast([NET SALES1] as decimal(10,2)) as [NET SALES1]
+--				  FROM [dsr].[BW_NON_HARD]
+--				union all
+--				SELECT 
+--						[Sales document]
+--					  ,[Customer Name]
+--					  ,case 
+--							when [Product Hierarchy Level 2 Name] = 'Applications' THEN 'Solutions'
+--							when [Product Hierarchy Level 2 Name] = 'IT Software' THEN 'Solutions'
+--							when [Product Hierarchy Level 2 Name] = 'IT Managed Services' THEN 'Solutions'
+--							when [Product Hierarchy Level 2 Name] = '101/Not assigned' THEN 'Consumables'
+--							when [Product Hierarchy Level 2 Name] = 'Consumables (A3)' THEN 'Consumables'
+--							when [Product Hierarchy Level 2 Name] = 'Spare Parts (A3)' THEN 'Spare Parts'
+--							when [Product Hierarchy Level 2 Name] = 'Consumables (A4)' THEN 'Consumables'
+--							when [Product Hierarchy Level 2 Name] = 'Spare parts (A4)' THEN 'Spare Parts'
+--							when [Product Hierarchy Level 2 Name] = 'Machines (A3)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Accessories (A3)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Documentation (A3)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Machines (A4)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Accessories (A4)' THEN 'Hard'
+--							when [Product Hierarchy Level 2 Name] = 'Documentation (A4)' THEN 'Hard'
+--								else [Product Hierarchy Level 2 Name]
+--									End as Category
+--					  ,cast( [NET SALES1] as decimal(10,2)) as [NET SALES1]
+--				FROM [dsr].[BW_HARD]
+--			   ) a
+
+--where [NET SALES1] < 0 
+--	and [Customer Name] in (
+--						'MASTERCOPY OFFICE SOLUTIONS',
+--						'THE SIGMA GROUP',
+--						'ORKNEY OFFICE SUPPLIES LTD',
+--						'CANON (UK) LIMITED',
+--						'THE SIGMA GROUP',
+--						'B D S COMPUTER LTD',
+--						'THE DANWOOD GROUP LTD',
+--						'CONNECT BUSINESS TECHNOLOGY LTD',
+--						'CBE SOLUTIONS',
+--						'DIGITAL NERVE CENTRE',
+--						'TUDOR BUSINESS SERVICES LTD',
+--						'DIGITAL COPIER SYSTEMS EASTERN LTD.',
+--						'IVORY SERVICE SOLUTIONS LTD',
+--						'PBS COMMUNICATIONS LIMITED',
+--						'1 OFFICE EQUIPMENT LIMITED',
+--						'ALTODIGITAL NETWORKS LTD',
+--						'E.B.S',
+--						'COPYBEST (ESSEX) LIMITED',
+--						'CSL BUSINESS MACHINES LTD',
+--						'ETHOS IMAGING LTD',
+--						'ADVANCED IMAGING SYSTEMS LIMITED',
+--						'COPY-IT LTD',
+--						'GEERINGS DIGITAL LIMITED',
+--						'FIRST CLASS BUSINESS SOLUTIONS LTD',
+--						'PRINCIPAL 1 LTD.',
+--						'TEFFONT BUSINESS SYSTEMS LTD',
+--						'COPYTECH GROUP SERVICES LIMITED',
+--						'CONCORDE 1 LIMITED',
+--						'CLAYTON BUSINESS MACHINES',
+--						'COPYFORM',
+--						'KRL GROUP LTD',
+--						'COS SYSTEMS LIMITED',
+--						'ETHOS COMMUNICATIONS SOLUTIONS LTD',
+--						'UNITED BUSINESS MACHINES LTD',
+--						'ESSEX DIGITAL COPIERS',
+--						'MIDREPRO LTD',
+--						'LINKMORE BUSINESS COMMUNICATIONS LT',
+--						'ARC OFFICE SYSTEMS LTD',
+--						'COLLATE BUSINESS SYSTEMS LTD.',
+--						'REFAX SYSTEMS LIMITED',
+--						'ALDERSHOT BUSINESS MACHINES LTD',
+--						'LYNBROOK MANAGED SERVICES LIMITED',
+--						'BUSINESS BY TECHNOLOGY LIMITED',
+--						'WOODBANK OFFICE SOLUTIONS LIMITED',
+--						'NCS GROUP LTD',
+--						'COPYLINK DIGITAL LTD',
+--						'SW DIGITAL SYSTEMS LTD',
+--						'SOLUTIONS IN TECHNOLOGY LTD',
+--						'CORONA BUSINESS SOLUTIONS LIMITED',
+--						'HOLLY DIGITAL',
+--						'APOGEE CORPORATION LTD',
+--						'XEROX IBS NI LIMITED',
+--						'BORDER OFFICE SUPPLIES & SYSTEMS LT',
+--						'TECHNOCOPY LTD',
+--						'M-PRESS IMAGING SYSTEMS',
+--						'MIDSHIRE COMMUNICATIONS LTD',
+--						'CORONA CORPORATE SOLUTIONS LTD',
+--						'COPYLOGIC LTD',
+--						'APPOINTMENT BUSINESS MACHINES LTD',
+--						'EKS DIGITAL SOLUTIONS LTD',
+--						'LASERLIFE   (VITESSE PLC T/A)',
+--						'XPERT DIGITAL  DOC SOL (UK) LTD',
+--						'INCOVO LTD',
+--						'KC DIGITAL SERVICES LTD',
+--						'C S DIGITAL',
+--						'FAXCO MAINTENANCE LTD',
+--						'DIGITAL COPIER SYSTEMS LTD',
+--						'PRINCIPAL 1 LTD (Account 2)',
+--						'ANNODATA LTD',
+--						'MB OFFICE SYSTEMS LTD',
+--						'KEELEY TRAVIS BUSINESS SOL LTD',
+--						'The Copier Company Ltd',
+--						'PHOTOCOPIERS DIRECT LTD',
+--						'CAPITAL DOCUMENT SOLUTIONS LIMITED',
+--						'SYSTEM INFORMATION TECHNOLOGY LTD',
+--						'WEAVER BUSINESS MACHINES LTD',
+--						'LON PHOTOCOPYING CO LTD T/A IN-DOC',
+--						'M.B DIGITAL LIMITED',
+--						'ARENA GROUP',
+--						'AUTOMATED SYSTEMS GROUP LIMITED',
+--						'OFFICE IMPRESSIONS LIMITED',
+--						'FOUR DIGITAL SOLUTIONS LTD',
+--						'WORKFLOW IMAGING SYSTEMS',
+--						'INSIGHT SYSTEMS LTD',
+--						'PULSE DIGITAL OFFICE SOLUTIONS LTD',
+--						'ALPHA COPIER SERVICES LTD',
+--						'BAYTEK OFFICE SOLUTIONS LTD',
+--						'DATASHARP INDEPENDENT SOLUTIONS',
+--						'KN SUPPLIES',
+--						'AIT LTD',
+--						'DIGITAL IMAGE SOLUTIONS',
+--						'UK VENDING LTD',
+--						'GEMINI COMMUNICATIONS',
+--						'APEX DIGITAL GRAPHICS LTD',
+--						'DOTS UK LTD',
+--						'CONTROL PRINT SOLUTIONS LTD',
+--						'ABC BUSINESS SYSTEMS LTD',
+--						'ORICOM LIMITED',
+--						'CITI BUSINESS SYSTEMS LTD',
+--						'PENKETHS LTD',
+--						'PRO COPY LTD',
+--						'ITEC CONNECT LIMITED',
+--						'VOHKUS LIMITED',
+--						'INFLOW SOLUTIONS LTD',
+--						'ARGON Office Systems Limited',
+--						'CCS Media',
+--						'TOUCHTEC SOLUTIONS LTD',
+--						'Master-Plan Systems ltd',
+--						'ESSEX BUSINESS MACHINES LTD',
+--						'BLACKBOX SOLUTIONS',
+--						'BECHTLE UK',
+--						'RESTORE SCAN LIMITED',
+--						'ELITE OFFICE SOLUTIONS',
+--						'DIGITEC LIMITED',
+--						'TECHNODOCS LIMITED',
+--						'COPY RIGHT SYSTEM LTD',
+--						'MY TOTAL OFFICE SOLUTIONS LIMITED',
+--						'TYPHOON HOUSE',
+--						'COMMERCIAL AND INDUSTRIAL CLEANING',
+--						'COPY PRINT SOLUTIONS LIMITED',
+--						'HAD-IT-LIMITED',
+--						'NORTH EAST BUSINESS SYSTEMS LTD',
+--						'PURE CLOUD SOLUTIONS LIMITED',
+--						'ACS BUSINESS SUPPLIES',
+--						'FAST TECHNOLOGY LONDON LIMITED',
+--						'SMART DIGITAL BUSINESS SOLUTIONS LI',
+--						'DATATECH DOCUMENT SYSTEMS LIMITED',
+--						'SERVICE OFFSET SUPPLIES LIMITED',
+--						'KEVIN JAMES LIMITED',
+--						'MERIT PROFESSIONAL SERVICES',
+--						'WESTCOAST LIMITED'
+--						)
+--group by 
+--	[Sales document]
+--	,[Customer Name]
+--	,Category
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_DSR_READY_OB This is the formatting of the order book for the DSR
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+DELETE FROM dsr.FDT_ORDERBOOK_DSR_READY_OB
+INSERT INTO dsr.FDT_ORDERBOOK_DSR_READY_OB
+
+SELECT
+	[Report]
+	,[Hard / Non Hard]
+	,[Carry Over]
+	,[Sales document]
+	,[Customer Name]
+	,[Customer Post Code]
+	,[Sales Person]
+	,[Main Material]
+	,[Product area name]
+	,[Product Area Category]
+	,[Product Hierarchy]
+	,[Material group name]
+	--,[Total Revenue]
+	,[Revenue Region]
+	,[Sol Deferral]
+	,[Revenue adjusted] as [Total Revenue]
+	,Units
+	,Channel
+	,Region
+	,[Shipping Status]
+FROM dsr.DSR_OUTPUT_OLD_MAPPING
+WHERE Report = 'Orderbook' and channel not like 'Dealer'
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.DSR_OUTPUT_OLD_MAPPING_DEALER - This creates the final DSR output for dealer only
+-----------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM dsr.DSR_OUTPUT_OLD_MAPPING_DEALER
+INSERT INTO dsr.DSR_OUTPUT_OLD_MAPPING_DEALER
+
+
+
+SELECT 
+	'Actual' as [Report]
+	,Hard_Non_Hard as [Hard / Non Hard]
+	,[Carry Over] as [Carry Over]
+	,[Sales document]
+	,[Customer Name] as [Customer Name]
+	,'' as [Sales Person]
+	,Material as [Main Material]
+	,[Product Area] as [Product area name]
+	,[P.Area] as [Product Area Category]
+	,[Product hier#lev# 1] as  [Product Hierarchy]
+	,Category as [Material group name]
+	,[NET SALES] as [Total Revenue]
+	,[NET SALES] as [Revenue Region]
+	,[Sol Def] as [Sol Deferral]
+	,[Amount (£)] as [Revenue adjusted]
+	,Units as Units
+	,Channel
+	,Sales_Region as Region
+	,[sales district (act)] as [BW Sales Area]
+	,Category
+FROM dsr.FDT_BW_FORMATTED
+WHERE Channel = 'Dealer' 
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.ORDERBOOK_CHECK_LARGE_DEALS Calculates the deals over 100,000 using variable @LARGEDEAL
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+DELETE FROM dsr.FDT_ORDERBOOK_CHECK_LARGE_DEALS
+INSERT INTO dsr.FDT_ORDERBOOK_CHECK_LARGE_DEALS
+
+SELECT * FROM(
+SELECT
+	[Customer Name]
+	,Channel
+	,SUM([Rev region less Sol defer]) as Total_Revenue
+	,sum([Units]) as Units
+FROM dsr.FDT_ORDERBOOK_FORMATTED
+GROUP BY
+	[Customer Name]
+	,Channel
+		UNION ALL
+			SELECT
+				[Customer name]
+				,Channel
+				,SUM(CAST(Amount as decimal(10,2))) as Total_Revenue
+				,0 as Units
+			FROM dsr.MANUAL_ADJUSTMENT
+			GROUP BY
+				[Customer name]
+				,Channel) ks
+GROUP BY
+	[Customer Name]
+	,Channel
+	,Total_Revenue
+	,Units
+HAVING SUM([Total_Revenue]) >= @LARGEDEAL
+ORDER BY [Total_Revenue] DESC
+
+PRINT 'Large Customers'
+select * from dsr.FDT_ORDERBOOK_CHECK_LARGE_DEALS
+
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+This section between the stars provides numbers needed for error checking
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+----THIS WILL HIGHLIGHT ANY NEW COLUMNS TO ADD TO REVENUE PIVOT
+DECLARE @COLUMNS NVARCHAR(MAX)
+DECLARE @ALL NVARCHAR(MAX) = ''
+
+SELECT @ALL =
+	COUNT([Report_Category])
+FROM  dsr.PREPFORWF
+WHERE [Report_Category] is not null AND [Report_Category] NOT IN ('Orderbook PP','Orderbook A4','BW Sol','BW A3','BW A4','BW PP','Orderbook Sol','Orderbook A3')
+GROUP BY [Report_Category]
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--dsr.FDT_ORDERBOOK_CHECK_NEGATIVES Calculates the deals showing negative using variable @NEGATIVE2
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_ORDERBOOK_CHECK_NEGATIVES
+INSERT INTO dsr.FDT_ORDERBOOK_CHECK_NEGATIVES
+
+SELECT
+	[Customer Name]
+	,SUM([Total Revenue]) as Total_Revenue
+	,COUNT([Total Revenue]) as Units
+
+FROM dsr.FDT_ORDERBOOK_FORMATTED
+GROUP BY
+	[Customer Name]
+HAVING SUM([Total Revenue]) <= @NEGATIVE2
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This highlights the large negative values in the BW report
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+DELETE FROM dsr.FDT_BW_CHECK_LARGE_NEGATIVES
+INSERT INTO dsr.FDT_BW_CHECK_LARGE_NEGATIVES
+
+
+
+
+SELECT *  FROM dsr.FDT_BW_FORMATTED WHERE CAST([NET SALES] as decimal(10,2)) < @NEGATIVE and Channel = 'Dealer'
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This section shows the missing business units from dsr.FDT_ORDERBOOK_FORMATTED
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_ORDERBOOK_CHECK_MISSING_BUSINESS_UNITS
+INSERT INTO dsr.FDT_ORDERBOOK_CHECK_MISSING_BUSINESS_UNITS
+
+
+
+SELECT * FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Business Unit] is null
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This shows orders on bw not on orderbook
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+DELETe FROM dsr.FDT_ON_OB_NOT_BW
+INSERT INTO dsr.FDT_ON_OB_NOT_BW
+
+
+
+SELECt *  from dsr.FDT_ORDERBOOK_FORMATTED
+WHERE [Sales document] not in 
+(SELECt DISTINCT [Sales document] FROM dsr.FDT_BW_FORMATTED)
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This shows orders on orderbook not on bw
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+delete from dsr.FDT_ON_BW_NOT_OB 
+insert into dsr.FDT_ON_BW_NOT_OB 
+
+
+
+SELECt *  from dsr.FDT_BW_FORMATTED
+WHERE [Sales document] not in 
+(SELECt DISTINCT [Sales document] FROM dsr.FDT_ORDERBOOK_FORMATTED )
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This section shows the missing business units from dsr.FDT_BW_FORMATTED
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DELETE FROM dsr.FDT_BW_CHECK_MISSING_BUSINESS_UNITS
+INSERT INTO dsr.FDT_BW_CHECK_MISSING_BUSINESS_UNITS
+
+
+SELECt * 
+FROM dsr.FDT_BW_FORMATTED WHERE CRM_Business_Unit is null or CRM_Business_Unit = 'Error'
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This checks dsr.FDT_BW_FORMATTED matches dsr.BW_HARD and DSR.BW_NON_HARD
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+Delete from dsr.FDT_BW_VALUE_CHECK
+insert into dsr.FDT_BW_VALUE_CHECK
+
+SELECT *  FROM (
+SELECT
+	(SELECT SUM(CAST([NET SALES] as decimal(10,2))) FROM dsr.BW_HARD) + (SELECT SUM(CAST([NET SALES] as decimal(10,2))) FROM dsr.BW_NON_HARD) as Total_RAW_BW
+	,(SELECT SUM(CAST([NET SALES] as decimal(10,2))) FROM dsr.FDT_BW_FORMATTED) as TOTAL_FORMATTED_BW
+	,(SELECT SUM(CAST([Amount (£)] as decimal(10,2))) from dsr.FDT_BW_FORMATTED) as TOTAL_FORMATTED_AOUNT
+	,(SELECT sum(CAST([SD GS Others] as decimal(10,2))) from dsr.FDT_BW_FORMATTED) as Total_SD_GS_OTHERS
+	,(SELECT sum(CAST([sol def] as decimal(10,2))) from dsr.FDT_BW_FORMATTED) as Solution_deferal
+	,(SELECT SUM([sol def]) + SUM([Rebate_Percentage]) + SUM([Amount (£)]) FROM dsr.FDT_BW_FORMATTED) tb_compare) kd
+
+------------------------------------------------------------------------------------------------------------- 
+--This checks dsr.FDT_ORDERBOOK_FORMATTED  matches base.commissionsOB
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+Delete from dsr.FDT_OB_VALUE_CHECK
+Insert into dsr.FDT_OB_VALUE_CHECK
+
+
+SELECT *  FROM ( 
+				SELECT
+					(SELECT SUM(CAST([Revenue Region] as decimal(10,2))) FROM base.COMMISSIONS_OB WHERE [Calendar Year/Month] = @MONTH) TOTAL_RAW_OB,
+					(SELECT SUM(CAST([Revenue Region] as decimal(10,2))) FROM #obformat WHERE [Calendar Year/Month] = @MONTH and [Revenue Locator] = 'Revenue Region') TOTAL_FORMATTED_OB
+					,(SELECT sum([Rev region less Sol defer]) from dsr.FDT_ORDERBOOK_FORMATTED )as TOTAL_INCLUDING_SOLUTIONS 
+				) kd
+
+select * 
+from base.COMMISSIONS_OB
+where [Sales document] in (
+							Select distinct 
+								[sales document] 
+							from
+								(
+								SELECT 
+									a.[Sales document], 
+									sum(cast([revenue region] as decimal(10,2))) as [Formatted amount],
+									[raw amount]
+								FROM #obformat a
+								LEFT JOIN (SELECT [sales document], sum(Cast([revenue region] as decimal(10,2))) as [raw amount] FROM base.COMMISSIONS_OB WHERE [Calendar Year/Month] = @MONTH group by [sales document]) b
+								 on a.[Sales document] = b.[Sales document]
+								WHERE 
+									[Calendar Year/Month] = @MONTH 
+									and [Revenue Locator] = 'Revenue Region' 
+								group by a.[Sales document], [raw amount]
+								HAVING sum([revenue region]) <> [raw amount]
+								) a
+							)
+
+select * 
+from #obformat
+where [Sales document] in (
+							Select distinct 
+								[sales document] 
+							from
+								(
+								SELECT 
+									a.[Sales document], 
+									sum(cast([revenue region] as decimal(10,2))) as [Formatted amount],
+									[raw amount]
+								FROM #obformat a
+								LEFT JOIN (SELECT [sales document], sum(Cast([revenue region] as decimal(10,2))) as [raw amount] FROM base.COMMISSIONS_OB WHERE [Calendar Year/Month] = @MONTH group by [sales document]) b
+								 on a.[Sales document] = b.[Sales document]
+								WHERE 
+									[Calendar Year/Month] = @MONTH 
+									and [Revenue Locator] = 'Revenue Region' 
+								group by a.[Sales document], [raw amount]
+								HAVING sum([revenue region]) <> [raw amount]
+								) a
+							)
+
+
+--SELECT * FROM BASE.COMMISSIONS_OB WHERE [Calendar Year/Month] = 'DEC 2018'
+--SELECT * FROM #obformat WHERE [Calendar Year/Month] = 'DEC 2018' AND [Revenue Locator] = 'REVENUE REGION'
+
+------------------------------------------------------------------------------------------------------------------------------------------------ 
+--This provide a summary of key numbers for error checking
+-----------------------------------------------------------------------------------------------------------------------------------------------`
+
+DECLARE @OB_PROD_AREA_NULL INT
+SELECT @OB_PROD_AREA_NULL = COUNT (*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Product Area Category] is null
+
+DECLARE @CRM_BUSINESS_UNIT_NULL INT
+SELECT @CRM_BUSINESS_UNIT_NULL = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Business Unit] is null
+
+DECLARE @COMPANY_NULL INT
+SELECT @COMPANY_NULL = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Company] is null
+
+DECLARE @EXCLUSIONS INT
+SELECT @EXCLUSIONS = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Exclude] = 'Exclude'
+
+DECLARE @TOTAL INT
+SELECT @TOTAL = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED 
+
+DECLARE @CARRYOVER INT
+SELECT @CARRYOVER = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Carry Over] = 'CarryOver'
+
+DECLARE @TRIALERROR INT
+SELECT @TRIALERROR = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Trial, Not Relevant or not Assigned with Values] = 'Error'
+
+DECLARE @SOLUTIONERROR INT
+SELECT @SOLUTIONERROR = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Solutions, shipped not invoiced] = 'Error'
+
+DECLARE @NAMEERROR INT
+SELECT @NAMEERROR = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE CHARINDEX('Error',[Error_In_Name],0)>0
+
+DECLARE @OBSALESPERSONMISSING INT
+SELECT @OBSALESPERSONMISSING = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [Salesmand not assigned] = 'Error'
+
+DECLARE @CRMQUOTEMISSING INT
+SELECT @CRMQUOTEMISSING = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [No CRM Quote ID] = 'Error'
+
+DECLARE @FRAMEWORKMISSING INT
+SELECT @FRAMEWORKMISSING  = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE [No framework partner] = 'Error'
+
+DECLARE @RENTAL INT
+SELECT @RENTAL = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE RENTAL_CHECK = 'Konica'
+
+DECLARE @PP INT
+SELECT @PP = COUNT(*) FROM dsr.FDT_ORDERBOOK_FORMATTED WHERE PP_DEAL = 'PP'
+
+DECLARE @BWBU INT
+SELECT @BWBU = COUNT(*) from dsr.FDT_BW_FORMATTED WHERE [CRM_Business_Unit] = 'error'
+
+DECLARE @ONOBNOTBW INT
+SELECT @ONOBNOTBW = COUNT(*) from dsr.FDT_ON_OB_NOT_BW
+
+DECLARE @ONBWNOTOB INT
+SELECT @ONBWNOTOB = COUNT(*) from dsr.FDT_ON_BW_NOT_OB
+
+DELETE FROM dsr.FDT_INITIAL_CHECK_SHEET
+INSERT INTO dsr.FDT_INITIAL_CHECK_SHEET
+
+SELECT *  FROM (
+				SELECT
+					'OB - Total Lines' as [Name]
+					,@TOTAL as [Number]
+				UNION ALL
+				SELECT
+					'OB - Product_Area_Category_Missing' as [Name]
+					,@OB_PROD_AREA_NULL as [Number]
+				UNION ALL
+				SELECT
+					'OB - CRM_Business_Unit_Missing' as [Name]
+					,@CRM_BUSINESS_UNIT_NULL as [Number]
+				UNION ALL
+				SELECT
+					'OB - Company_Missing' as [Name]
+					,@COMPANY_NULL as [Number]
+				UNION ALL
+				SELECT
+					'OB - Exclusions' as [Name]
+					,@EXCLUSIONS as [Number]
+				UNION ALL
+				SELECT
+					'OB - Carry Over' as [Name]
+					,@CARRYOVER as [Number]
+				UNION ALL
+				SELECT
+					'OB - Trial, Not Relevant or not Assigned with Values' as [Name]
+					,@TRIALERROR as [Number]
+				UNION ALL
+				SELECT
+					'OB - Solutions, shipped not invoiced' as [Name]
+					,@SOLUTIONERROR as [Number]
+				UNION ALL
+				SELECT
+					'OB - Error_In_Name' as [Name]
+					,@NAMEERROR as [Number]
+				UNION ALL
+				SELECT
+					'OB - Salesmand not assigned' as [Name]
+					,@OBSALESPERSONMISSING as [Number]
+				UNION ALL
+				SELECT
+					'OB - No CRM Quote ID' as [Name]
+					,@CRMQUOTEMISSING as [Number]
+				UNION ALL
+				SELECT
+					'OB - No framework partner' as [Name]
+					,@FRAMEWORKMISSING  as [Number]
+				UNION ALL
+				SELECT
+					'OB - Rentals' as [Name]
+					,@RENTAL as [Number]
+				UNION ALL
+				SELECT
+					'OB - PP Deals' as [Name]
+					,@PP as [Number]
+				UNION ALL
+				SELECT
+					'WF - Missing Columns' as [Name]
+					,@ALL   as [Number]
+				UNION ALL
+				SELECT
+					'BW - CRM_Business_Unit_Missing'  as [Name],
+					@BWBU as [Number]
+				UNION ALL
+				SELECT
+					'ON OB NOT ON BW' as [Name],
+					@ONOBNOTBW as [Number]
+				UNION ALL
+				SELECT
+					'ON BW NOT ON OB' as [Name],
+					@ONBWNOTOB as [Number]
+
+				) kd
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+End of Error checking
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+CREATION OF GRAPH DATA INDIRECT
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+DELETE FROM dsr.GRAPH_DATA_INDIRECT WHERE Report_Date = CAST(GETDATE() as date)
+insert into dsr.GRAPH_DATA_INDIRECT
+
+SELECT 
+  CAST(GETDATE() as date) as Report_Date
+,(SELECT SUM ([Revenue adjusted])  FROM dsr.DSR_OUTPUT_OLD_MAPPING where Channel = 'Dealer' and Report = 'Actual') as [BW Total]
+,(SELECT SUM ([Revenue adjusted])  FROM dsr.DSR_OUTPUT_OLD_MAPPING where Channel = 'Dealer' and Report = 'Orderbook') as [Orderbook Total]
+					
+
+DELETE FROM dsr.GRAPH_DATA_CURRENT_MONTH_INDIRECT 
+INSERT INTO dsr.GRAPH_DATA_CURRENT_MONTH_INDIRECT
+SELECT *  FROM dsr.GRAPH_DATA_INDIRECT
+WHERE
+MONTH(Report_Date) = MONTH(dateadd(dd, -1, GetDate()))
+AND
+YEAR(Report_Date) = YEAR(dateadd(dd, -1, GetDate()))
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+CREATION OF GRAPH DATA DIRECT
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+DELETE FROM dsr.GRAPH_DATA WHERE Report_Date = CAST(GETDATE() as date)
+insert into dsr.GRAPH_DATA
+
+SELECT 
+  CAST(GETDATE() as date) as Report_Date
+,(SELECT SUM ([Revenue adjusted]) as BW_Total FROM dsr.DSR_OUTPUT_OLD_MAPPING where Channel not like 'Dealer' and Report = 'Actual' and Region not like 'Service') as [BW Total]
+,(SELECT CAST(SUM([Revenue adjusted]) as decimal(10,2)) FROM dsr.DSR_OUTPUT_OLD_MAPPING  where Channel not like 'Dealer' and Report = 'Orderbook')  as [Orderbook Total] 
+
+DELETE FROM dsr.GRAPH_DATA_CURRENT_MONTH 
+INSERT INTO dsr.GRAPH_DATA_CURRENT_MONTH
+SELECT * FROM dsr.GRAPH_DATA
+WHERE
+MONTH(Report_Date) = MONTH(dateadd(dd, -1, GetDate()))
+AND
+YEAR(Report_Date) = YEAR(dateadd(dd, -1, GetDate()))
+
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+ADDITIONAL MAPPING REQUIRED
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+delete from dsr.FDT_ADDITIONAL_MAPPING_REQUIRED 
+insert into dsr.FDT_ADDITIONAL_MAPPING_REQUIRED 
+
+SELECT * FROM (
+Select [Sales document], [Sales District (act)],Area,[Sales group (act)],'' as [Sales Person] from dsr.BW_HARD where [Sales document] in( select distinct [sales document] from dsr.DSR_OUTPUT_OLD_MAPPING where Channel is null)
+union all
+Select [Sales document],[Sales District (act)],Area,[Sales group (act)],'' as [Sales Person]  from dsr.BW_NON_HARD where [Sales document] in( select distinct [sales document] from dsr.DSR_OUTPUT_OLD_MAPPING where Channel is null)
+union all
+Select [Sales document],District,Office,[Group],[Sales Person Name]  from dsr.FDT_ORDERBOOK_FORMATTED where [Sales document] in ( select distinct [sales document] from dsr.DSR_OUTPUT_OLD_MAPPING where Channel is null)
+union all
+Select [Order],[Sales District1],[Region],[Sales Office],[Sales Person]  from dsr.POSTPONED_DELIVERIES where [Order] in ( select distinct [sales document] from dsr.DSR_OUTPUT_OLD_MAPPING where Channel is null)
+) kd
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+ORDERBOOK MASTER REPORT
+****************************************************************************************************************************
+***************************************************************************************************************************/
+DELETE FROM dsr.FDT_ORDERBOOK_MASTER_SHAREPOINT 
+INSERT INTO dsr.FDT_ORDERBOOK_MASTER_SHAREPOINT
+
+SELECT 
+	  [Calendar Year/Month] as [Calendar Year/Month]
+      ,[Regional Manager] as [Regional Manager]
+	  ,ob.region as [Region]
+	  ,Channel as [District]
+	  ,[Group] as Branch
+	  ,[Branch Manager]
+	  ,[Sales Person Name] as [Sales person]
+	  ,[Sales document]
+	  ,[Main Material]
+      ,[Product hier#lev# 1 name] as [Product hier.lev. 1]
+      ,[Product area name] as [Product Area]
+      ,ob.[Customer condition G] as [Customer condition G]
+      ,[Consignee Name] as [Consignee]
+      ,[Shipping status] as [Shipping status]
+      ,[Total Revenue]
+      ,[Lease Settlement]
+      ,[Revenue Salesperson]
+      ,[Calc# Salesperson GP] as [Calc. Sales men GP]
+      ,[Revenue Region]
+      ,[Region GP]
+      ,[Sales quantity]
+	  ,ht.Translation as [Type]
+	  ,CASE WHEN ht.Translation = 'HW Upgrade' THEN [Revenue Region] ELSE 0 END AS [HW Upgrade Revenue]
+	  ,CASE WHEN ht.Translation = 'HW Growth' THEN [Revenue Region] ELSE 0 END AS [HW Growth Revenue]
+	  ,CASE WHEN [Product hier#lev# 1 name] = 'Solutions' THEN [Revenue Region] ELSE 0 END AS [Solutions Revenue]
+	  ,CASE WHEN ht.Translation = 'Sol Upgrade' THEN [Revenue Region] ELSE 0 END AS [Sol Upgrade Revenue]
+	  ,CASE WHEN ht.Translation = 'Sol Growth' THEN [Revenue Region] ELSE 0 END AS [Sol Growth Revenue]
+	  ,CASE WHEN LEFT(ht.Translation,3) = 'PPD' THEN [Revenue Region] ELSE 0 END AS [PPD Revenue]
+	  ,CASE WHEN ht.Translation = 'PPD Upgrade' THEN [Revenue Region] ELSE 0 END AS [PPD Upgrade Revenue]
+	  ,CASE WHEN ht.Translation = 'PPD Growth' THEN [Revenue Region] ELSE 0 END AS [PPD Growth Revenue]
+	  ,CASE WHEN [Calc# Salesperson GP] < 0 THEN 0 ELSE [Calc# Salesperson GP] END  AS [GP]
+	  ,0 as [Delayed Delivery]
+	  ,[Product Area Category]
+	 
+from #obformat ob
+LEFT JOIN [dsr].[SALES_PERSONS] sp
+	ON ob.[Sales Person Name] = sp.[Sales Person]
+LEFT JOIN [lup].[CUSTOMER CONDITION G MEANINGS] g
+	on g.[Customer condition G] = ob.[Customer condition G]
+LEFT JOIN [dsr].[HARDWARE TYPES] ht
+	ON ht.[Type] = [Product hier#lev# 1 name]+[Product area name]+g.meaning
+where exclude <> 'Exclude' and [Calendar Year/Month] in (
+															'APR 2019',
+															'MAY 2019',
+															'JUN 2019',
+															'JUL 2019',
+															'AUG 2019',
+															'SEP 2019',
+															'OCT 2019',
+															'NOV 2019',
+															'DEC 2019',
+															'JAN 2020',
+															'FEB 2020',
+															'MAR 2020'
+														)
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+DSR END OF MONTH REPORT
+****************************************************************************************************************************
+***************************************************************************************************************************/
+---------------------------------------------------------------------------------------------------------------------------
+--ORDERBOOK SOLUTIONS DEFERRAL
+----------------------------------------------------------------------------------------------------------------------------
+DELETE FROM DSR.FDT_SOLUTION_DEFERRAL_ORDERBOOK
+INSERT INTO DSR.FDT_SOLUTION_DEFERRAL_ORDERBOOK
+
+SELECT [Sales document]
+      ,[Customer]
+      ,[Customer Name]
+      ,[2nd Order]
+      ,[Sales Person]
+      ,[Sales Person Name]
+      ,[Shipping status]
+      ,[Consignee]
+      ,[Consignee Name]
+      ,[Main Material]
+      ,[Product hier#lev# 2]
+      ,[Product Area]
+      ,[Product area name]
+      ,[Product hier#lev# 1]
+      ,[Product hier#lev# 1 name]
+      ,[Material group]
+      ,[Material group name]
+      ,[Equipment]
+      ,[Postal Code (Equipme]
+      ,[District]
+      ,[Office]
+      ,[Group]
+      ,[Framework Partner]
+      ,[Leasing type]
+      ,[Document Date]
+      ,[Leasing Company]
+      ,[Lease Company Name]
+      ,[Linking Pin Falcon]
+      ,[Customer condition G]
+      ,[Calendar Year/Month]
+      ,[Total Revenue]
+      ,[Lease Settlement]
+      ,[Revenue Salesperson]
+      ,[Deduction]
+      ,[Commissionable Revenue]
+      ,[Honours Club Adjust#]
+      ,[Sales Base]
+      ,[Calc# Salesperson GP]
+      ,[Revenue Region]
+      ,[ITP Price]
+      ,[Region GP]
+      ,[Sales quantity]
+      ,[Units]
+      ,[RENTAL_CHECK]
+      ,[Sol Deferral]
+      ,[Rev region less Sol defer]
+  FROM [dsr].[FDT_ORDERBOOK_FORMATTED]
+  WHERE [SOL DEFERRAL] > 0
+
+---------------------------------------------------------------------------------------------------------------------------
+--BW SOLUTIONS DEFERRAL
+----------------------------------------------------------------------------------------------------------------------------
+DELETE FROM DSR.FDT_SOLUTION_DEFERRAL_BW
+INSERT INTO DSR.FDT_SOLUTION_DEFERRAL_BW
+
+SELECT [Company Code]
+      ,[Distribution channel]
+      ,[Costelement]
+      ,[Sales Office (act)]
+      ,[Area]
+      ,[Sales District (act)]
+      ,[Sales group (act)]
+      ,[Product Area]
+      ,[Material group (act)]
+      ,[Category]
+      ,[Customer]
+      ,[Customer Name]
+      ,[Sales document]
+      ,[Product hier#lev# 6]
+      ,[Quality Standard]
+      ,[Name]
+      ,[Product hier#lev# 1]
+      ,[Maintenance Plant]
+      ,[Material]
+      ,[NET SALES]
+      ,[SD GS Others]
+      ,[Total Quantity2]
+      ,[Amount (£)]
+      ,[Carry Over]
+      ,[Sol Def]
+      ,[Rebate_Percentage] as Rebate_Amount
+  FROM [dsr].[FDT_BW_FORMATTED]
+  where [sol def] > 0
+
+---------------------------------------------------------------------------------------------------------------------------
+--BW REBATE AMOUNT
+----------------------------------------------------------------------------------------------------------------------------
+
+DELETE FROM DSR.FDT_REBATE_PERCENTAGE_BW
+INSERT INTO DSR.FDT_REBATE_PERCENTAGE_BW
+
+SELECT [Company Code]
+      ,[Distribution channel]
+      ,[Costelement]
+      ,[Sales Office (act)]
+      ,[Area]
+      ,[Sales District (act)]
+      ,[Sales group (act)]
+      ,[Product Area]
+      ,[Material group (act)]
+      ,[Category]
+      ,[Customer]
+      ,[Customer Name]
+      ,[Sales document]
+      ,[Product hier#lev# 6]
+      ,[Quality Standard]
+      ,[Name]
+      ,[Product hier#lev# 1]
+      ,[Maintenance Plant]
+      ,[Material]
+      ,[NET SALES]
+      ,[SD GS Others]
+      ,[Total Quantity2]
+	  ,HARD_NON_HARD
+      ,[Amount (£)]
+      ,[Carry Over]
+      ,[Sol Def]
+      ,[Rebate_Percentage] as Rebate_Amount
+  FROM [dsr].[FDT_BW_FORMATTED]
+  where [Rebate_Percentage] > 0
+
+---------------------------------------------------------------------------------------------------------------------------
+--END OF MONTH ORDERBOOK
+---------------------------------------------------------------------------------------------------------------------------
+
+DELETE FROM DSR.FDT_ORDERBOOK_RAW_END_OF_MONTH
+INSERT INTO DSR.FDT_ORDERBOOK_RAW_END_OF_MONTH
+
+SELECT * FROM BASE.COMMISSIONS_OB WHERE [Calendar Year/Month] = @MONTH
+
+---------------------------------------------------------------------------------------------------------------------------
+--END OF MONTH ORDERBOOK
+---------------------------------------------------------------------------------------------------------------------------
+
+delete from dsr.SHIPPING_ERRORS
+insert into dsr.SHIPPING_ERRORS
+
+select * from base.commissions_ob  where [Shipping status] = 'shipped, not invoice' and [biling document] not like '#' and [Calendar Year/Month] = @month
+
+---------------------------------------------------------------------------------------------------------------------------
+--CHECKING BW HARD AGAINST BW FORMATTED
+---------------------------------------------------------------------------------------------------------------------------
+--select	h.[Sales document], 
+--			count(h.[sales document]) as 'Raw Count',
+--			count(f.[sales document]) as 'Formatted Count',
+--			count(h.[sales document]) - count(f.[sales document]) as 'Difference',
+--			SUM(CAST(h.[NET SALES] as decimal(10,2))),
+--			SUM(CAST(f.[NET SALES] as decimal(10,2))),
+--			SUM(CAST(h.[NET SALES] as decimal(10,2))) - SUM(CAST(f.[NET SALES] as decimal(10,2))) as 'Rev Diff'
+
+--from		dsr.BW_HARD h
+
+--left join	dsr.FDT_BW_FORMATTED f
+--on			f.[Sales document] = h.[sales document]
+
+--Group by
+--			h.[sales document]
+--having
+--			SUM(CAST(h.[NET SALES] as decimal(10,2))) - SUM(CAST(f.[NET SALES] as decimal(10,2))) > 0
+--order by
+--			count(h.[sales document]) - count(f.[sales document]) desc
+
+
+
+/**************************************************************************************************************************
+CARRY OVER CHECK
+**************************************************************************************************************************/
+
+DELETE FROM dsr.CARRY_OVER_CHECK
+INSERT INTO dsr.CARRY_OVER_CHECK
+
+SELECT * from (
+				SELECT a.[Sales document]
+					  ,[Sales Doc]
+					  ,sum([Amount]) as 'Carry over'
+					  ,sum(b.[rev region less sol defer]) as Orderbook
+					  ,case when sum([Amount]) = sum(b.[rev region less sol defer]) then 'Good' else 'Check' end as indicator
+				  FROM [dsr].[MONTHLY_CARRY_OVER] a
+				  left join (SELECt * from fmp.FULL_ORDERBOOK_FORMATTED) b
+					on a.[Sales document] = b.[Main Material] + b.[Sales document]
+				group by 
+					a.[Sales document]
+					,[Sales Doc]
+					,a.[Carry Over]
+				) a
+Where indicator = 'Check'

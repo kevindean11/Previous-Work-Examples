@@ -1,0 +1,2791 @@
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED       ADD REPORT DATE TO EXPORT DATED FILE
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+INSERT INTO fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED
+select
+		GETDATE() as Report_Date
+		,id
+		,sales_doc
+		,'' as district
+		,'' as bus_type
+		,ob_framework
+		,cont_name_sold_to
+		,ob_main_material
+		,equipment_no
+		,'' as framework_match
+		,'' as funding_match
+		,'' as rental_match
+		,'' as term_match
+		,'' as click_match
+FROM
+		fmp.MATRIX_FINANCE_MATRIX_EXPORT
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC        ADD APPROVED ORDERS TO HISTORIC CHECK TABLE
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+INSERT INTO  fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC
+SELECT 
+		*
+FROM 
+		FMP.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_FILE
+WHERE 
+		[Approved] = 'Yes'
+UNION all
+SELECT [id]
+      ,[ob_2nd_order]
+      ,[equipment_no]
+      ,[ob_main_material]
+      ,[cont_sold_to_party]
+      ,[cont_name_sold_to]
+      ,[ob_doc_date]
+      ,[vpe]
+      ,[Rental_assignment]
+      ,[Contract Value]
+      ,[Orderbook]
+      ,[Variance]
+      ,[Error Value]
+      ,[Variance_Indicator]
+      ,[Checked Rental Value]
+      ,[Checked Term]
+      ,[Checked?]
+      ,[SOP Comment]
+      ,[Checker]
+      ,[Length Outstanding]
+      ,[Weeks Outstanding]
+      ,[Approved]
+      ,[Date Approved]
+      ,[Finance Comment]
+      ,[2nd Contract Variance]
+      ,[2nd Variance]
+  FROM [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK_FILE]
+WHERE [Approved] = 'Yes'
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC                             
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+INSERT INTO fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC
+SELECT 
+	   GETDATE() as Report_Date,
+	   [id]
+      ,[ob_2nd_order]
+      ,[equipment_no]
+      ,[ob_main_material]
+      ,[cont_sold_to_party]
+      ,[cont_name_sold_to]
+      ,[ob_doc_date]
+      ,[vpe]
+      ,[Rental_assignment]
+      ,[Contract Value]
+      ,[Orderbook]
+      ,[Variance]
+      ,[Error Value]
+      ,[Variance_Indicator]
+      ,[Checked Rental Value]
+      ,[Checked Term]
+      ,[Checked?]
+      ,[SOP comment]
+      ,[Checker]
+      ,[Length Outstanding]
+      ,[Weeks Outstanding]
+      ,[Approved]
+      ,[Date Approved]
+      ,[Finance Comment]
+      ,[2nd Contract Variance]
+      ,[2nd Variance]
+	  
+	   FROM fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE
+	   WHERE [Approved] = 'Yes'
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------#ORDERBOOK     THIS CREATES AN ORDER BOOK WITH NO HASTAGS IN THE COLLECTIVE ORDERNUMBER
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	[Sales Document],
+	[Collective Number],
+	SUM(CAST([Total Revenue] as DECIMAL (10,2))) AS [Total Revenue]
+INTO #ORDERBOOK
+FROM base.commissions_ob
+WHERE [Sales document] NOT LIKE '#' AND 
+[Collective Number] NOT LIKE '#'
+GROUP BY [Sales document], [Collective Number]
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------#ORDERBOOK2     THIS CREATES AN ORDER BOOK WITH NO HASTAGS IN THE COLLECTIVE ORDERNUMBER
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	[Sales Document],
+	[2nd Order],
+	[Collective Number],
+	CASE WHEN CAST([Revenue Region] as DECIMAL (10,2)) = 0.00 THEN CAST([Revenue Salesperson] as DECIMAL (10,2))
+		ELSE CAST([Revenue Region] as DECIMAL (10,2))
+			END  AS [Total Revenue]
+INTO #ORDERBOOK2
+FROM base.commissions_ob
+WHERE [Sales document] NOT LIKE '#' AND 
+[Collective Number] NOT LIKE '#'
+GROUP BY [Sales document], [Collective Number], [2nd Order], [Revenue Region], [Revenue Salesperson]
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------#FULLCCSORDERS     THIS JOINS MI REPORT ONE TO MATRIX FINANCE MATRIX EXPORT TO CREATE A FULL LIST OF CCS ORDERS TO COMPARE TO ORDERBOOK
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+SELECT
+	ob_sales_document,
+	MIN(Total) as Total
+INTO #FULLCCSORDERS
+FROM
+	(SELECT
+		ob_sales_document,
+		vpe * Rental_assignment as Total
+	FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT
+	UNION ALL
+	SELECT
+		sales_document,
+		vpe * rental_assignment as Total
+	FROM fmp.MATRIX_MI_REPORT_ONE) k
+GROUP BY ob_sales_document
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------ #ORDERBOOKCOLLORDER     LOOKS AT ORDERBOOK, SUMS TOTAL REVENUE PER COLLECTIVE ORDER NUMBER AND OUTPUTS TO TEMP TABLE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+		cast([Collective Number] AS VARCHAR(MAX)) as [Collective Number],
+		SUM([Total Revenue]) AS Sum_of_Total_Revenue
+INTO	 
+		#ORDERBOOKCOLLORDER
+FROM
+		#ORDERBOOK
+GROUP BY cast([Collective Number] AS VARCHAR(MAX))
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------#MATRIXCOLLORDER    LOOKS AT MATRIX, CALCULATES RENTAL AMOUNT X TERM PER COLLECTIVE ORDER NUMBER PULLED FROM ORDERBOOK USING SALES DOCUMENT AS JOIN, 
+------                    OUTPUT TO TEMP TABLE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+		COB.[Collective Number],
+		FMR.ob_sales_document,
+		FMR.ob_2nd_order,
+		FMR.VPE * FMR.RENTAL_ASSIGNMENT AS Matrix_Total_Revenue
+INTO
+		#MATRIXCOLLORDER
+FROM
+		FMP.MATRIX_FINANCE_MATRIX_EXPORT AS FMR
+LEFT JOIN
+		#ORDERBOOK AS COB
+		ON FMR.ob_sales_document = COB.[Sales document]
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC as h
+		ON h.ob_2nd_order = fmr.ob_sales_document
+LEFT JOIN fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC wtf
+		ON wtf.ob_2nd_order = fmr.ob_sales_document
+WHERE h.ob_2nd_order IS NULL AND
+	  wtf.ob_2nd_order IS NULL
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------#NOTONORDERBOOK       NOT ON ORDERBOOK 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+		ob_sales_document,
+		[Collective Number]
+INTO
+		#NOTONORDERBOOK
+FROM
+		#MATRIXCOLLORDER
+WHERE
+		[Collective Number] IS NULL
+GROUP BY
+		ob_sales_document,
+		[Collective Number]
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------#MATRIXCOLLORDERGROUPED       GROUP BY COLLECTIVE SALES ORDER FROM MATRIX TABLE 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+		MCO.[Collective Number],
+		SUM(MCO.Matrix_Total_Revenue) AS Sum_Of_Matrix_Total_Revenue
+INTO
+		#MATRIXCOLLORDERGROUPED
+FROM
+		#MATRIXCOLLORDER AS MCO
+LEFT JOIN
+		#NOTONORDERBOOK AS NOOB
+		ON NOOB.[Collective Number] = MCO.[Collective Number]
+WHERE
+		MCO.[Collective Number] IS NOT NULL
+GROUP BY
+		MCO.[Collective Number]
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------ #OKTOAPPENDZEROS        OK TO APPEND COLLECTIVE ORDERS WHERE BOTH MATRIX AND ORDERBOOK VALUE EQUALS ZERO 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+		fmr.[Collective Number],
+		fmr.Sum_Of_Matrix_Total_Revenue,
+		cob.Sum_Of_Total_Revenue,
+		fmr.Sum_Of_Matrix_Total_Revenue - cob.Sum_Of_Total_Revenue AS Differing_Amount,
+		0 AS Variance,
+		'Check' AS Variance_Indicator
+INTO
+		#OKTOAPPENDZEROS
+FROM	
+		#MATRIXCOLLORDERGROUPED AS FMR
+LEFT JOIN
+		#ORDERBOOKCOLLORDER AS COB
+		ON FMR.[Collective Number] = cob.[Collective Number]
+WHERE 
+		FMR.Sum_Of_Matrix_Total_Revenue = 0 AND
+		COB.Sum_of_Total_Revenue = 0
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+----- #DONOTAPPENDZEROS        DO NOT APPEND COLLECTIVE ORDERS WHERE BOTH MATRIX AND ORDERBOOK VALUE EQUALS ZERO 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+		fmr.[Collective Number],
+		fmr.Sum_Of_Matrix_Total_Revenue,
+		cob.Sum_Of_Total_Revenue,
+		fmr.Sum_Of_Matrix_Total_Revenue - cob.Sum_Of_Total_Revenue AS Differing_Amount,
+		0 AS Variance,
+		'Check' AS Variance_Indicator
+INTO
+		#DONOTAPPENDZEROS
+
+FROM	
+		#MATRIXCOLLORDERGROUPED AS FMR
+LEFT JOIN
+		#ORDERBOOKCOLLORDER AS COB
+		ON FMR.[Collective Number] = cob.[Collective Number]
+WHERE 
+		(FMR.Sum_Of_Matrix_Total_Revenue = 0 AND
+		COB.Sum_of_Total_Revenue <> 0) OR
+		(FMR.Sum_Of_Matrix_Total_Revenue <> 0 AND
+		COB.Sum_of_Total_Revenue = 0)
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+-----#FULLVARIANCEINDICATOR       Shows the result of comparing #FULLCCSREPORT TO OB
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	[Collective Number],
+	SUM(OB_TOTAL_REVENUE) as Collective_OB,
+	SUM(MATRIX_TOTAL_REVENUE) as Collective_MATRIX,
+	SUM(MATRIX_TOTAL_REVENUE)-SUM(OB_TOTAL_REVENUE) as Differing_amount,
+	SUM(OB_TOTAL_REVENUE)/SUM(MATRIX_TOTAL_REVENUE) as Variance,
+	CASE
+		WHEN SUM(OB_TOTAL_REVENUE)/SUM(MATRIX_TOTAL_REVENUE) between 0.899999 and 1.1000001 THEN 'Good'
+		ELSE 'Check'
+		End as Variance_Indicator
+INTO #FULLVARIANCEINDICATOR
+FROM
+	(SELECT
+		[Sales Document],
+		o.[Collective Number],
+		[Total Revenue] as OB_TOTAL_REVENUE,
+		c.Total as MATRIX_TOTAL_REVENUE
+	FROM #ORDERBOOK o
+	JOIN #FULLCCSORDERS c
+		ON o.[Sales Document] = c.ob_sales_document
+		LEFT JOIN
+		#OKTOAPPENDZEROS AS OTAZ
+		ON OTAZ.[Collective Number] = o.[Collective Number]
+	LEFT JOIN
+		#DONOTAPPENDZEROS AS DNAZ
+		ON DNAZ.[Collective Number] = o.[Collective Number]
+	WHERE
+		OTAZ.[Collective Number] IS NULL AND
+		DNAZ.[Collective Number] IS NULL AND
+	 c.Total is not null AND
+	o.[Collective Number] NOT LIKE '#' AND
+	c.Total <> 0) q
+
+GROUP BY [Collective Number]
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+---#READYREPORT      THIS TABLE CONTAINS ALL OF THE COLLECTIVE ORDER NUMBERS FOUND IN THE ORDERBOOK WHEN COMPARING AGAINST MATRIX REPORTTHAT HAVE BEEN 
+---                  IDENTIFIED AS BEING WITHIN 10% TOLERANCE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------		
+SELECT 
+		* 
+INTO
+		#READYREPORT
+FROM
+(		
+SELECT
+		[Collective Number],
+		Collective_MATRIX,
+		Collective_OB,
+		Differing_Amount,
+		Variance,
+		Variance_Indicator
+FROM
+		#FULLVARIANCEINDICATOR AS MOCI
+WHERE
+		Variance_Indicator = 'Good'
+
+) AS TMP
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---#CHECKREPORT      THIS TABLE CONTAINS ALL OF THE COLLECTIVE ORDER NUMBERS FOUND IN THE ORDERBOOK WHEN COMPARING AGAINST MATRIX REPORTTHAT HAVE BEEN 
+---                  IDENTIFIED AS BEING OUTSIDE 10% TOLERANCE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------		
+SELECT 
+		* 
+INTO
+		#CHECKREPORT
+FROM
+(		
+SELECT
+		[Collective Number],
+		Collective_MATRIX,
+		Collective_OB,
+		Differing_Amount,
+		Variance,
+		Variance_Indicator
+FROM
+		#FULLVARIANCEINDICATOR  AS MOCI
+WHERE
+		Variance_Indicator = 'Check'
+UNION ALL
+
+SELECT
+		[Collective Number],
+		Sum_Of_Matrix_Total_Revenue,
+		Sum_Of_Total_Revenue,
+		Differing_Amount,
+		Variance,
+		Variance_Indicator
+FROM
+		#DONOTAPPENDZEROS
+UNION ALL
+
+SELECT
+		[Collective Number],
+		Sum_Of_Matrix_Total_Revenue,
+		Sum_Of_Total_Revenue,
+		Differing_Amount,
+		Variance,
+		Variance_Indicator
+FROM
+		#OKTOAPPENDZEROS
+) AS TMP
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---#READYREPORTLLD     THIS TABLE IS #READYREPORT WITH LINE LEVEL DETAIL ADDED FROM THE ORIGINAL MATRIX REPORT 
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	mco.[Collective Number],
+	Collective_MATRIX,
+	Collective_OB,
+	Differing_Amount,
+	rr.Variance,
+	rr.Variance_Indicator,
+	mco.ob_sales_document
+INTO #READYREPORTLLD
+FROM #READYREPORT as rr
+JOIN #MATRIXCOLLORDER as mco
+	ON rr.[Collective Number] = mco.[Collective Number]
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC as h
+		ON h.ob_2nd_order = mco.[ob_sales_document]
+LEFT JOIN fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC wtf
+		ON wtf.ob_2nd_order = mco.[ob_sales_document]
+WHERE h.ob_2nd_order IS NULL AND
+	  wtf.ob_2nd_order IS NULL
+
+	
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK                                
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+									
+
+
+
+
+DELETE FROM fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK
+INSERT INTO fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK
+
+
+
+SELECT kd.[id]
+      , kd.[ob_sales_document]
+      ,kd.[equipment_no]
+      ,kd.[ob_main_material]
+      ,kd.[cont_sold_to_party]
+      ,kd.[cont_name_sold_to]
+      ,kd.[ob_doc_date]
+      ,kd.[vpe]
+      ,kd.[Rental_assignment]
+      ,kd.[Contract Value]
+      ,kd.[Orderbook]
+      ,kd.[Variance]
+      ,kd.[Error Value]
+      ,kd.[Variance_Indicator]
+      ,kd.[Checked Rental Value]
+      ,kd.[Checked Term]
+      ,kd.[Checked?]
+      ,kd.[SOP Comment]
+      ,kd.[Checker]
+		,CASE 
+			WHEN datediff(day,CAST(MIN(z.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(z.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding]
+		,datediff(day,CAST(MIN(z.report_date) AS DATE),getdate())/7 AS [Weeks Outstanding]
+      ,kd.[Approved]
+      ,kd.[Date Approved]
+      ,kd.[Finance Comment]
+      ,kd.[2nd Contract Variance]
+      ,kd.[2nd Variance]  FROM( SELECT [id]
+									  ,case when [ob_2nd_order] = '52.55' then '1000000' else [ob_2nd_order] end as [ob_sales_document]
+									  ,[equipment_no]
+									  ,[ob_main_material]
+									  ,[cont_sold_to_party]
+									  ,[cont_name_sold_to]
+									  ,[ob_doc_date]
+									  ,[vpe]
+									  ,CAST([Rental_assignment] as DECIMAL(10,2)) as [Rental_assignment]
+									  ,[Contract Value]
+									  ,[Orderbook]
+									  ,[Variance]
+									  ,[Error Value]
+									  ,[Variance_Indicator]
+									  ,'' as [Checked Rental Value]
+									  ,'' as [Checked Term]
+									  ,'' as [Checked?]
+									  ,'' as [SOP Comment]
+									  ,'' as [Checker]
+									  ,[Length Outstanding]
+									  ,[Weeks Outstanding]
+									  ,'' as [Approved]
+									  ,'' as [Date Approved]
+									  ,'' as [Finance Comment]
+									  ,'' as [2nd Contract Variance]
+									  ,'' as [2nd Variance]
+								  FROM [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_FILE] b
+								  WHERE b.[Checked?] = 'Yes' and b.Approved is null
+
+									UNION ALL
+
+										SELECT a.[id]
+											  ,CAST(b.[ob_sales_document] as int) as [ob_sales_document]
+											  ,a.[equipment_no]
+											  ,a.[ob_main_material]
+											  ,a.[cont_sold_to_party]
+											  ,a.[cont_name_sold_to]
+											  ,a.[ob_doc_date]
+											  ,a.[vpe]
+											  ,CAST(a.[Rental_assignment] as DECIMAL (10,2)) as [Rental_assignment]
+											  ,[Contract Value]
+											  ,[Orderbook]
+											  ,[Variance]
+											  ,[Error Value]
+											  ,[Variance_Indicator]
+											  ,'' as [Checked Rental Value]
+											  ,'' as [Checked Term]
+											  ,'' as [Checked?]
+											  ,'' as [SOP Comment]
+											  ,'' as [Checker]
+											  ,[Length Outstanding]
+											  ,[Weeks Outstanding]
+											  ,'' as [Approved]
+											  ,'' as [Date Approved]
+											  ,'' as [Finance Comment]
+											  ,'' as [2nd Contract Variance]
+											  ,'' as [2nd Variance]
+										  FROM [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK_FILE] a
+										  LEFT JOIN [fmp].[MATRIX_FINANCE_MATRIX_EXPORT] b
+											ON a.id = b.id
+										WHERE [Approved] is null) kd
+
+LEFT Join #READYREPORTLLD a
+	on a.ob_sales_document = kd.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC ch
+	on ch.id = kd.id
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED z
+	on kd.id = z.es_id
+WHERE a.ob_sales_document is null and ch.id is null
+GROUP BY 
+	kd.[id]
+	, kd.[ob_sales_document]
+	,kd.[equipment_no]
+	,kd.[ob_main_material]
+	,kd.[cont_sold_to_party]
+	,kd.[cont_name_sold_to]
+	,kd.[ob_doc_date]
+	,kd.[vpe]
+	,kd.[Rental_assignment]
+	,kd.[Contract Value]
+	,kd.[Orderbook]
+	,kd.[Variance]
+	,kd.[Error Value]
+	,kd.[Variance_Indicator]
+	,kd.[Checked Rental Value]
+	,kd.[Checked Term]
+	,kd.[Checked?]
+	,kd.[SOP Comment]
+	,kd.[Checker]
+	,kd.[Approved]
+	,kd.[Date Approved]
+	,kd.[Finance Comment]
+	,kd.[2nd Contract Variance]
+	,kd.[2nd Variance] 
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---  #CHECKREPORTLLD      THIS TABLE IS #CHECKREPORT WITH LINE LEVEL DETAIL ADDED FROM THE ORIGINAL MATRIX REPORT 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	mco.[Collective Number],
+	Collective_MATRIX,
+	Collective_OB,
+	Differing_Amount,
+	cr.Variance,
+	cr.Variance_Indicator,
+	Matrix_Total_Revenue,
+	mco.ob_sales_document
+INTO #CHECKREPORTLLD
+FROM #CHECKREPORT as cr
+JOIN #MATRIXCOLLORDER as mco
+	ON cr.[Collective Number] = mco.[Collective Number]
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC as h
+		ON h.ob_2nd_order = mco.[ob_sales_document]
+LEFT JOIN fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC wtf
+		ON wtf.ob_2nd_order = mco.[ob_sales_document]
+LEFT JOIN fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK c
+	on c.ob_sales_document = mco.ob_sales_document
+WHERE h.ob_2nd_order IS NULL AND
+	  wtf.ob_2nd_order IS NULL AND
+	  c.ob_sales_document is null
+	  
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO       THIS INSERTS NEW RECORDS TO THE READY TO GO TABLE (fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO )
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO 
+
+SELECT
+	id,
+	sorg,
+	sales_doc,
+	item,
+	ordrs,
+	contract_start,
+	contract_end,
+	vpe,
+	equipment_no,
+	ob_main_material,
+	ob_sales_office,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	Flat_frequency,
+	Rental_assignment,
+	asset,
+	mfmr.ob_sales_document,
+	CAST(mfmr.ob_2nd_order as int) as ob_2nd_order,
+	ob_framework,
+	ob_doc_date,
+	ob_leasing_type,
+	approval,
+	term,
+	assignment_rental,
+	committed_value
+
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfmr
+JOIN #READYREPORTLLD as rr
+	ON mfmr.ob_sales_document = rr.ob_sales_document
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO       INSERTS RECORDS INTO THE READY TO GO TABLE THAT HAVE BEEN APPROVED BY FINANCE TO BE INCLUDED.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO 
+SELECT
+	mfmr.id,
+	mfmr.sorg,
+	mfmr.sales_doc,
+	mfmr.item,
+	mfmr.ordrs,
+	mfmr.contract_start,
+	mfmr.contract_end,
+	mfmr.vpe,
+	mfmr.equipment_no,
+	mfmr.ob_main_material,
+	mfmr.ob_sales_office,
+	mfmr.cont_sold_to_party,
+	mfmr.cont_name_sold_to,
+	mfmr.Flat_frequency,
+	mfmr.Rental_assignment,
+	mfmr.asset,
+	mfmr.ob_sales_document,
+	CAST(mfmr.ob_2nd_order as int) as ob_2nd_order,
+	mfmr.ob_framework,
+	mfmr.ob_doc_date,
+	mfmr.ob_leasing_type,
+	mfmr.approval,
+	mfmr.term,
+	mfmr.assignment_rental,
+	mfmr.committed_value
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfmr
+JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC as h
+	ON mfmr.id = h.id
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT	    THIS IS THE CREATION OF THE finalised check report
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT
+
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT	 
+SELECT
+	mfmr.id,
+	mfmr.ob_sales_document,
+	equipment_no,
+	ob_main_material,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	ob_doc_date,
+	vpe,
+	Rental_assignment,
+	cr.Matrix_Total_Revenue [Contract Value],
+	o.[Total Revenue] AS Orderbook,
+	cr.Variance,
+	cr.Differing_Amount AS [Error Value],
+	cr.Variance_Indicator,
+	'' AS [Checked Rental Value],
+	'' AS [Checked Term],
+	'' AS [Checked?],
+	'' AS [SOP Comment],
+	'' AS [Checker],
+	CASE 
+			WHEN datediff(day,CAST(MIN(ed.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding],
+	datediff(day,CAST(MIN(ed.report_date) AS DATE),getdate())/7 AS [Weeks Outstanding],
+	'' as Approved,
+	'' as [Date Approved],
+	'' as [Finance Comment],
+	'' as [2nd Contract Variance],
+	'' AS [2nd Variance]
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfmr
+JOIN #CHECKREPORTLLD as cr
+	ON mfmr.ob_sales_document = cr.ob_sales_document
+LEFT JOIN (SELECT [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK_FILE].id from [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK_FILE]) l
+ ON l.id = mfmr.id
+LEFT JOIN #ORDERBOOK o
+	on o.[Sales document] = mfmr.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED as ed
+	on ed.es_id = mfmr.id
+LEFT JOIN (SELECT id from fmp.[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_FILE] WHERE [Checked?] = 'Yes' and Approved is null) xx
+	on xx.id = mfmr.id
+ WHERE	l.id is null and xx.id is null
+
+	
+GROUP BY
+		mfmr.id,
+		mfmr.ob_sales_document,
+		equipment_no,
+		ob_main_material,
+		cont_sold_to_party,
+		cont_name_sold_to,
+		ob_doc_date,
+		vpe,
+		Rental_assignment,
+		cr.Collective_MATRIX,
+		cr.Collective_OB,
+		cr.Variance,
+		cr.Differing_Amount,
+		cr.Variance_Indicator,
+		contract_start,
+		cr.Matrix_Total_Revenue,
+		o.[Total Revenue]
+		
+	
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT	    THIS INSERTS ANY NOT ON FOUND ON THE ORDERBOOK WHEN # REMOVED TO THE CHECK REPORT
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT	 
+SELECT
+	mfmr.id,
+	mfmr.ob_sales_document,
+	equipment_no,
+	ob_main_material,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	ob_doc_date,
+	vpe,
+	Rental_assignment,
+	cr.Collective_MATRIX AS [Contract Value],
+	cr.Collective_OB AS Orderbook,
+	cr.Variance,
+	cr.Differing_Amount AS [Error Value],
+	'Check' as Variance_Indicator,
+	'' AS [Checked Rental Value],
+	'' AS [Checked Term],
+	'' AS [Checked?],
+	'' AS [SOP Comment],
+	'' AS [Checker],
+	CASE 
+			WHEN datediff(day,CAST(MIN(ed.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding],
+	datediff(day,CAST(MIN(ed.report_date) AS DATE),getdate())/7 AS [Weeks Outstanding],
+	'' as Approved,
+	'' as [Date Approved],
+	'' as [Finance Comment],
+	'' as [2nd Contract Variance],
+	'' AS [2nd Variance]
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfmr
+LEFT JOIN #CHECKREPORTLLD as cr
+	ON mfmr.ob_sales_document = cr.ob_sales_document
+JOIN #NOTONORDERBOOK AS NOB
+	ON NOB.ob_sales_document = MFMR.ob_sales_document
+LEFT JOIN (SELECT [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK_FILE].id from [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK_FILE]) noby
+	ON noby.id = mfmr.id
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED as ed
+	on ed.es_id = mfmr.id
+
+GROUP BY
+		mfmr.id,
+		mfmr.ob_sales_document,
+		equipment_no,
+		ob_main_material,
+		cont_sold_to_party,
+		cont_name_sold_to,
+		ob_doc_date,
+		vpe,
+		Rental_assignment,
+		cr.Collective_MATRIX,
+		cr.Collective_OB,
+		cr.Variance,
+		cr.Differing_Amount,
+		cr.Variance_Indicator,
+		contract_start
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---#MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED       REMOVES HASTAGS FROM fmp.MATRIX_SALES_ORDERS_INVOICED_AMOUNT SALES DOCUMENT
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+SELECT
+	CAST([Sales document] as int) as [Sales document],
+	CAST(SUM(CAST(Amount as DECIMAL(10,2))) as decimal (10,2)) as TOTAL
+	INTO #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED
+FROM fmp.MATRIX_SALES_ORDERS_INVOICED_AMOUNT
+WHERE [Sales document] NOT LIKE '#' AND [Sales document] NOT LIKE '19963834#'
+GROUP BY [Sales document]
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---#BW_OB_CHECK_MATCH       THIS CARRIES OUT THE INITIAL CHECK AGAINST MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED
+---                         FROM THE READY TO GO TABLE TO CHECK IF THEY ARE PRESENT.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	id,
+	sorg,
+	sales_doc,
+	item,
+	ordrs,
+	contract_start,
+	contract_end,
+	vpe,
+	equipment_no,
+	ob_main_material,
+	ob_sales_office,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	Flat_frequency,
+	Rental_assignment,
+	asset,
+	CAST(ob_sales_document as INT) as ob_sales_document,
+	ob_2nd_order,
+	ob_framework,
+	ob_doc_date,
+	ob_leasing_type,
+	approval,
+	term,
+	assignment_rental,
+	committed_value
+INTO #BW_OB_CHECK_MATCH
+FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO as rtg
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as imr
+	ON CAST(imr.[Sales document] as INT) = CAST(rtg.ob_2nd_order as INT)
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as imr2
+	ON CAST(imr2.[Sales document] as INT) = CAST(rtg.ob_sales_document as INT)
+WHERE CAST(imr.[Sales document] as INT) IS NOT NULL OR CAST(imr2.[Sales document] as INT) IS NOT NULL
+GROUP BY
+	id,
+	sorg,
+	sales_doc,
+	item,
+	ordrs,
+	contract_start,
+	contract_end,
+	vpe,
+	equipment_no,
+	ob_main_material,
+	ob_sales_office,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	Flat_frequency,
+	Rental_assignment,
+	asset,
+	CAST(ob_sales_document as INT),
+	ob_2nd_order,
+	ob_framework,
+	ob_doc_date,
+	ob_leasing_type,
+	approval,
+	term,
+	assignment_rental,
+	committed_value
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---Fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH       THIS CARRIES OUT THE INITIAL CHECK AGAINST MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED
+---                                                      FROM THE READY TO GO TABLE TO CHECK IF THEY ARE PRESENT.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+DELETE FROM Fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH
+INSERT INTO fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH
+SELECT
+	id,
+	sorg,
+	sales_doc,
+	item,
+	ordrs,
+	contract_start,
+	contract_end,
+	vpe,
+	equipment_no,
+	ob_main_material,
+	ob_sales_office,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	Flat_frequency,
+	Rental_assignment,
+	asset,
+	CAST(ob_sales_document as INT) as ob_sales_document,
+	ob_2nd_order,
+	ob_framework,
+	ob_doc_date,
+	ob_leasing_type,
+	approval,
+	term,
+	assignment_rental,
+	committed_value
+FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_READY_TO_GO as rtg
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as imr
+	ON CAST(imr.[Sales document] as INT) = CAST(rtg.ob_2nd_order as INT)
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as imr2
+	ON CAST(imr2.[Sales document] as INT) = CAST(rtg.ob_sales_document as INT)
+WHERE CAST(imr.[Sales document] as INT) IS NULL and CAST(imr2.[Sales document] as INT) is null
+GROUP BY
+	id,
+	sorg,
+	sales_doc,
+	item,
+	ordrs,
+	contract_start,
+	contract_end,
+	vpe,
+	equipment_no,
+	ob_main_material,
+	ob_sales_office,
+	cont_sold_to_party,
+	cont_name_sold_to,
+	Flat_frequency,
+	Rental_assignment,
+	asset,
+	CAST(ob_sales_document as INT),
+	ob_2nd_order,
+	ob_framework,
+	ob_doc_date,
+	ob_leasing_type,
+	approval,
+	term,
+	assignment_rental,
+	committed_value
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---Fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH_HISTORIC	       CREATES A HISTORIC FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH                                             
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+INSERT INTO 
+		fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH_HISTORIC		
+SELECT 
+		GETDATE() AS [Report Date],
+		id,
+		sorg,
+		sales_doc,
+		item,
+		ordrs,
+		contract_start,
+		contract_end,
+		vpe,
+		equipment_no,
+		ob_main_material,
+		ob_sales_office,
+		cont_sold_to_party,
+		cont_name_sold_to,
+		Flat_frequency,
+		Rental_assignment,
+		asset,
+		CAST(ob_sales_document as INT) as ob_sales_document,
+		ob_2nd_order,
+		ob_framework,
+		ob_doc_date,
+		ob_leasing_type,
+		approval,
+		term,
+		assignment_rental,
+		committed_value
+FROM
+		fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---#BWOBFINANCECHECKINDICATOR       COMPARES BW TO THE OB FOR THOSE ORDERS THAT ARE READY TO GO AND ARE ON BW                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT * 
+INTO 
+		#BWOBFINANCECHECKINDICATOR
+		FROM
+		(
+			SELECT
+				id,		
+				ob_sales_document,
+				sum([total revenue]) as [total revenue],
+				case 
+					when bw.total IS not null then bw.TOTAL 
+					when bw2.total is not null then bw2.total else NULL end as total,
+				CASE
+					WHEN bw.total = 0 THEN 0.0001
+					WHEN bw2.total = 0 THEN 0.0001
+						ELSE
+							sum([Total Revenue]) / case 
+													when bw.total IS not null then bw.TOTAL 
+													when bw2.total is not null then bw2.total else 0 end
+							END as [Differing Amount],
+				CASE
+					WHEN bw.TOTAL = 0.00 THEN 'Check' 
+					WHEN bw2.TOTAL = 0.00 THEN 'Check' 
+						ELSE 
+							CASE
+								WHEN sum([Total Revenue]) / case 
+															when bw.total IS not null then bw.TOTAL 
+															when bw2.total is not null then bw2.total 
+																else 0 end between 0.8799999 and 1.1200001 THEN 'Good'
+								ELSE 'Check'
+									END 
+							END AS [Variance Indicator]
+
+			FROM
+					#BW_OB_CHECK_MATCH as cm
+			LEFT JOIN
+					#ORDERBOOK2 as ob
+					ON CAST(cm.ob_sales_document as INT)  = CAST(ob.[Sales document] as INT)
+			LEFT JOIN
+					#MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as bw
+					ON ob_2nd_order  = bw.[Sales document]
+			LEFT JOIN
+					#MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as bw2
+					ON ob_sales_document  = bw2.[Sales document]
+			GROUP BY
+				cm.ob_sales_document,
+				--ob.[Total Revenue],
+				bw.total,
+				bw2.total,
+				id) as k
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL      CREATES THE FINAL TABLE OF ORDERS WHICH HAVE BEEN APPROVED FOR TRANSFER TO MATRIX 2                                         
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+DELETE FROM 
+		fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+INSERT INTO 
+		fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+SELECT
+		mfme.id,
+		sorg,
+		sales_doc,
+		item,
+		ordrs,
+		contract_start,
+		contract_end,
+		mfme.vpe,
+		mfme.equipment_no,
+		mfme.ob_main_material,
+		ob_sales_office,
+		mfme.cont_sold_to_party,
+		mfme.cont_name_sold_to,
+		Flat_frequency,
+		mfme.Rental_assignment,
+		asset,
+		CAST(MFME.ob_sales_document as INT) as ob_sales_document,
+		mfme.ob_2nd_order,
+		ob_framework,
+		mfme.ob_doc_date,
+		ob_leasing_type,
+		'Approved' as approval,
+		CASE 
+			WHEN [Checked Term] IS NOT NULL THEN [Checked Term]
+			ELSE mfme.vpe
+			END	AS term,
+		CASE
+			WHEN [Checked Rental Value] IS NOT NULL THEN [Checked Rental Value]
+			ELSE mfme.rental_assignment
+			END AS assignment_rental,
+		CASE
+			WHEN C.[SALES DOCUMENT] IS NOT NULL THEN CAST(c.[BW TOTAL] AS DECIMAL(10,2))
+			WHEN d.[SALES DOCUMENT] IS NOT NULL THEN CAST(d.[BW TOTAL] AS DECIMAL(10,2))
+			WHEN [Checked Rental Value] IS NOT NULL THEN CAST([Checked Rental Value] AS DECIMAL (10,2)) *[Checked Term] 
+				ELSE mfme.rental_assignment*mfme.vpe
+					END AS committed_value
+FROM 
+		FMP.MATRIX_FINANCE_MATRIX_EXPORT AS MFME
+JOIN	
+		#BWOBFINANCECHECKINDICATOR AS BWOB
+		ON BWOB.ob_sales_document = MFME.ob_sales_document
+LEFT JOIN
+		FMP.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_FILE AS SLAG
+		ON SLAG.ob_2nd_order = MFME.ob_sales_document
+LEFT JOIN (SELECT B.[Sales document], sum(Amount) AS [BW TOTAL] FROM FMP.MATRIX_SALES_ORDERS_INVOICED_AMOUNT  A
+		  LEFT JOIN (SELECT [Sales document], [2ND ORDER] FROM BASE.COMMISSIONS_OB WHERE [Sales document] NOT LIKE '#' AND [2ND ORDER] NOT LIKE '#' group by [sales document], [2nd order]) B
+			ON A.[SALES DOCUMENT] = B.[2ND ORDER]
+		  WHERE B.[SALES DOCUMENT] IN (SELECT DISTINCT [SALES DOCUMENT] FROM
+									  (SELECT [sales document], [LEASING TYPE] FROM BASE.COMMISSIONS_OB WHERE [LEASING TYPE] = 'SALE TO CUSTOMER') K)
+		  GROUP BY B.[Sales document]) C
+	ON C.[SALES DOCUMENT] = MFME.OB_SALES_DOCUMENT
+LEFT JOIN (SELECT B.[Sales document], sum(Amount) AS [BW TOTAL] FROM FMP.MATRIX_SALES_ORDERS_INVOICED_AMOUNT  A
+		  LEFT JOIN (SELECT [Sales document] FROM BASE.COMMISSIONS_OB WHERE [Sales document] NOT LIKE '#' group by [Sales document]) B
+			ON A.[SALES DOCUMENT] = B.[sales document]
+		  WHERE B.[SALES DOCUMENT] IN (SELECT DISTINCT [SALES DOCUMENT] FROM
+									  (SELECT [sales document], [LEASING TYPE] FROM BASE.COMMISSIONS_OB WHERE [LEASING TYPE] = 'SALE TO CUSTOMER') K)
+		  GROUP BY B.[Sales document]) d
+	ON d.[SALES DOCUMENT] = MFME.OB_SALES_DOCUMENT
+WHERE [Variance Indicator] = 'Good'
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+INSERT INTO 
+		fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+SELECT
+	mfme.id,
+	mfme.sorg,
+	mfme.sales_doc,
+	mfme.item,
+	mfme.ordrs,
+	mfme.contract_start,
+	mfme.contract_end,
+	mfme.vpe,
+	mfme.equipment_no,
+	mfme.ob_main_material,
+	mfme.ob_sales_office,
+	mfme.cont_sold_to_party,
+	mfme.cont_name_sold_to,
+	mfme.Flat_frequency,
+	mfme.Rental_assignment,
+	asset,
+	CAST(MFME.ob_sales_document as INT) as ob_sales_document,
+	mfme.ob_2nd_order,
+	ob_framework,
+	mfme.ob_doc_date,
+	ob_leasing_type,
+	'Approved' as approval,
+	CASE 
+		WHEN [Checked Term] IS NOT NULL THEN [Checked Term]
+			ELSE mfme.vpe
+				END	AS term,
+	CASE
+		WHEN [Checked Rental Value] IS NOT NULL THEN [Checked Rental Value]
+			ELSE mfme.rental_assignment
+				END AS assignment_rental,
+	CASE
+		WHEN C.[SALES DOCUMENT] IS NOT NULL THEN CAST(c.[BW TOTAL] AS DECIMAL(10,2))
+		WHEN d.[SALES DOCUMENT] IS NOT NULL THEN CAST(d.[BW TOTAL] AS DECIMAL(10,2))
+		WHEN [Checked Rental Value] IS NOT NULL THEN CAST([Checked Rental Value] AS DECIMAL (10,2)) *[Checked Term] 
+			ELSE mfme.rental_assignment*mfme.vpe
+				END AS committed_value
+FROM FMP.MATRIX_FINANCE_MATRIX_EXPORT AS MFME
+JOIN fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC bocf
+	ON mfme.ob_sales_document = bocf.ob_2nd_order
+LEFT JOIN (SELECT B.[Sales document], sum(Amount) AS [BW TOTAL] FROM FMP.MATRIX_SALES_ORDERS_INVOICED_AMOUNT  A
+		  LEFT JOIN (SELECT [Sales document], [2ND ORDER] FROM BASE.COMMISSIONS_OB WHERE [Sales document] NOT LIKE '#' AND [2ND ORDER] NOT LIKE '#' group by [sales document], [2nd order]) B
+			ON A.[SALES DOCUMENT] = B.[2ND ORDER]
+		  WHERE B.[SALES DOCUMENT] IN (SELECT DISTINCT [SALES DOCUMENT] FROM
+									  (SELECT [sales document], [LEASING TYPE] FROM BASE.COMMISSIONS_OB WHERE [LEASING TYPE] = 'SALE TO CUSTOMER') K)
+		  GROUP BY B.[Sales document]) C
+	ON C.[SALES DOCUMENT] = MFME.OB_SALES_DOCUMENT
+LEFT JOIN (SELECT B.[Sales document], sum(Amount) AS [BW TOTAL] FROM FMP.MATRIX_SALES_ORDERS_INVOICED_AMOUNT  A
+		  LEFT JOIN (SELECT [Sales document] FROM BASE.COMMISSIONS_OB WHERE [Sales document] NOT LIKE '#' group by [Sales document]) B
+			ON A.[SALES DOCUMENT] = B.[sales document]
+		  WHERE B.[SALES DOCUMENT] IN (SELECT DISTINCT [SALES DOCUMENT] FROM
+									  (SELECT [sales document], [LEASING TYPE] FROM BASE.COMMISSIONS_OB WHERE [LEASING TYPE] = 'SALE TO CUSTOMER') K)
+		  GROUP BY B.[Sales document]) d
+	ON d.[SALES DOCUMENT] = MFME.OB_SALES_DOCUMENT
+GROUP BY
+  	mfme.id,
+	mfme.sorg,
+	mfme.sales_doc,
+	mfme.item,
+	mfme.ordrs,
+	mfme.contract_start,
+	mfme.contract_end,
+	mfme.vpe,
+	mfme.equipment_no,
+	mfme.ob_main_material,
+	mfme.ob_sales_office,
+	mfme.cont_sold_to_party,
+	mfme.cont_name_sold_to,
+	mfme.Flat_frequency,
+	mfme.Rental_assignment,
+	asset,
+	MFME.ob_sales_document,
+	mfme.ob_2nd_order,
+	ob_framework,
+	mfme.ob_doc_date,
+	ob_leasing_type,
+	approval,
+	term,
+	assignment_rental,
+	committed_value,
+	[Checked Term],
+	[Checked Rental Value],
+	C.[SALES DOCUMENT],
+	C.[BW TOTAL],
+	d.[BW TOTAL],
+	d.[SALES DOCUMENT]
+		UNION ALL
+			SELECT 
+				 [id]
+				,[sorg]
+				,[sales_doc]
+				,[item]
+				,[ordrs]
+				,[contract_start]
+				,[contract_end]
+				,[vpe]
+				,[equipment_no]
+				,[ob_main_material]
+				,[ob_sales_office]
+				,[cont_sold_to_party]
+				,[cont_name_sold_to]
+				,[flat_frequency]
+				,[rental_assignment]
+				,[asset]
+				,[ob_sales_document]
+				,[ob_2nd_order]
+				,[ob_framework]
+				,[ob_doc_date]
+				,[ob_leasing_type]
+				,'Queried' [approval]
+				,[term]
+				,[assignment_rental]
+				,[committed_value] 
+			FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT
+			WHERE id not in
+							(SELECT
+									mfme.id
+							FROM 
+									FMP.MATRIX_FINANCE_MATRIX_EXPORT AS MFME
+							JOIN	
+									#BWOBFINANCECHECKINDICATOR AS BWOB
+									ON BWOB.ob_sales_document = MFME.ob_sales_document
+							LEFT JOIN
+									FMP.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_FILE AS SLAG
+									ON SLAG.ob_2nd_order = MFME.ob_sales_document
+							WHERE [Variance Indicator] = 'Good') AND id not in 
+																				(
+																				SELECT
+																					mfme.id
+																				FROM 
+																						FMP.MATRIX_FINANCE_MATRIX_EXPORT AS MFME
+																				JOIN fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC bocf
+																					ON mfme.ob_sales_document = bocf.ob_2nd_order
+																				GROUP BY
+  																						mfme.id,
+																						mfme.sorg,
+																						mfme.sales_doc,
+																						mfme.item,
+																						mfme.ordrs,
+																						mfme.contract_start,
+																						mfme.contract_end,
+																						mfme.vpe,
+																						mfme.equipment_no,
+																						mfme.ob_main_material,
+																						mfme.ob_sales_office,
+																						mfme.cont_sold_to_party,
+																						mfme.cont_name_sold_to,
+																						mfme.Flat_frequency,
+																						mfme.Rental_assignment,
+																						asset,
+																						MFME.ob_sales_document,
+																						mfme.ob_2nd_order,
+																						ob_framework,
+																						mfme.ob_doc_date,
+																						ob_leasing_type,
+																						approval,
+																						term,
+																						assignment_rental,
+																						committed_value,
+																						[Checked Term],
+																						[Checked Rental Value])
+			GROUP BY
+				[id]
+				  ,[sorg]
+				  ,[sales_doc]
+				  ,[item]
+				  ,[ordrs]
+				  ,[contract_start]
+				  ,[contract_end]
+				  ,[vpe]
+				  ,[equipment_no]
+				  ,[ob_main_material]
+				  ,[ob_sales_office]
+				  ,[cont_sold_to_party]
+				  ,[cont_name_sold_to]
+				  ,[flat_frequency]
+				  ,[rental_assignment]
+				  ,[asset]
+				  ,[ob_sales_document]
+				  ,[ob_2nd_order]
+				  ,[ob_framework]
+				  ,[ob_doc_date]
+				  ,[ob_leasing_type]
+				  ,[term]
+				  ,[assignment_rental]
+				  ,approval
+				  ,[committed_value] 
+
+
+
+--Creates a final grouped table for the ready for uploaded. This had to be created to remove duplicates from the original final table
+DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS
+SELECT [id]
+      ,[sorg]
+      ,[sales_doc]
+      ,[item]
+      ,[ordrs]
+      ,[contract_start]
+      ,[contract_end]
+      ,[vpe]
+      ,[equipment_no]
+      ,[ob_main_material]
+      ,[ob_sales_office]
+      ,[cont_sold_to_party]
+      ,[cont_name_sold_to]
+      ,[Flat_frequency]
+      ,[Rental_assignment]
+      ,[asset]
+      ,[ob_sales_document]
+      ,[ob_2nd_order]
+      ,[ob_framework]
+      ,[ob_doc_date]
+      ,[ob_leasing_type]
+      ,[approval]
+      ,[term]
+      ,[assignment_rental]
+      ,[committed_value]
+  FROM [fmp].[FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL]
+
+  GROUP BY 
+
+  [id]
+      ,[sorg]
+      ,[sales_doc]
+      ,[item]
+      ,[ordrs]
+      ,[contract_start]
+      ,[contract_end]
+      ,[vpe]
+      ,[equipment_no]
+      ,[ob_main_material]
+      ,[ob_sales_office]
+      ,[cont_sold_to_party]
+      ,[cont_name_sold_to]
+      ,[Flat_frequency]
+      ,[Rental_assignment]
+      ,[asset]
+      ,[ob_sales_document]
+      ,[ob_2nd_order]
+      ,[ob_framework]
+      ,[ob_doc_date]
+      ,[ob_leasing_type]
+      ,[approval]
+      ,[term]
+      ,[assignment_rental]
+      ,[committed_value]
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_HISTORIC      CREATES A HISTORY OF THE FINAL TABLE OF ORDERS WHICH HAVE BEEN APPROVED FOR TRANSFER TO MATRIX 2                                         
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_HISTORIC WHERE id in (select distinct id from fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS)
+INSERT INTO	fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_HISTORIC
+SELECT
+		GETDATE() AS [Report Date],
+		id,
+		sorg,
+		sales_doc,
+		item,
+		ordrs,
+		contract_start,
+		contract_end,
+		vpe,
+		equipment_no,
+		ob_main_material,
+		ob_sales_office,
+		cont_sold_to_party,
+		cont_name_sold_to,
+		Flat_frequency,
+		Rental_assignment,
+		asset,
+		CAST(ob_sales_document as INT) as ob_sales_document,
+		ob_2nd_order,
+		ob_framework,
+		ob_doc_date,
+		ob_leasing_type,
+		approval,
+		term,
+		assignment_rental,
+		committed_value
+FROM
+		fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS
+WHERE approval = 'Approved'
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED      CREATES A TABLE WHICH SHOWS ALL OF THE ORDERS READY TO GO AND ON BW THAT DO HAVE HAVE A FINANCIAL
+--															   MATCH BETWEEN OB AND BW                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED
+SELECT 
+	mfme.id,
+	mfme.ob_sales_document,
+	mfme.equipment_no,
+	mfme.ob_main_material,
+	mfme.cont_sold_to_party,
+	mfme.cont_name_sold_to,
+	mfme.ob_doc_date,
+	mfme.vpe,
+	mfme.Rental_assignment,
+	bof.total AS BW,
+	bof.[total revenue] AS Orderbook,
+	bof.[Differing Amount],
+	bof.[Variance Indicator] AS Variance_Indicator,
+	'' AS [Checked Rental Value],
+	'' AS [Checked Term],
+	'' AS [Checked?],
+	'' AS [Comment],
+	'' AS [Checker],
+	CASE 
+			WHEN datediff(day,CAST(MIN(ed.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding],
+	datediff(day,CAST(MIN(ed.report_date) AS DATE),getdate())/7 AS [Weeks Outstanding],
+	'' as Approved,
+	'' as [Date Approved],
+	'' as [Finance Comment],
+	'' as [2nd Contract Variance],
+	'' AS [2nd Variance]
+FROM #BWOBFINANCECHECKINDICATOR bof
+JOIN fmp.MATRIX_FINANCE_MATRIX_EXPORT mfme
+	ON mfme.ob_sales_document = bof.ob_sales_document
+LEFT JOIN #ORDERBOOK o
+	ON o.[Sales document] = mfme.ob_sales_document
+left join fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED as ed
+	on ed.es_id = mfme.id
+left JOIN (SELECT * FROM fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE where Approved = 'Yes') bwobf
+	on CAST(bwobf.id as int) = CAST(bof.id as int)
+WHERE [Variance Indicator] = 'Check' and bwobf.ob_2nd_order is null
+GROUP BY
+	mfme.id,
+	mfme.ob_sales_document,
+	mfme.equipment_no,
+	mfme.ob_main_material,
+	mfme.cont_sold_to_party,
+	mfme.cont_name_sold_to,
+	mfme.ob_doc_date,
+	mfme.vpe,
+	mfme.Rental_assignment,
+	bof.total,
+	bof.[total revenue],
+	bof.[Differing Amount],
+	bof.[Variance Indicator]
+	
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+--CREATES FULLVARIANCE INDICATOR BW VS OB !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+SELECT
+			[Collective Number],
+			SUM(OB_TOTAL_REVENUE) as Collective_OB,
+			SUM(BW_TOTAL_REVENUE) as Collective_MATRIX,
+			SUM(BW_TOTAL_REVENUE)-SUM(OB_TOTAL_REVENUE) as Differing_amount,
+			SUM(OB_TOTAL_REVENUE)/SUM(BW_TOTAL_REVENUE) as Variance,
+			CASE
+				WHEN OB_TOTAL_REVENUE/BW_TOTAL_REVENUE between 0.8799999 and 1.1200001 THEN 'Good'
+				ELSE 'Check'
+				End as Variance_Indicator
+		INTO #BWVARIANCE
+		FROM
+			(SELECT
+				c.[Sales Document],
+				o.[Collective Number],
+				[Total Revenue] as OB_TOTAL_REVENUE,
+				c.Total as BW_TOTAL_REVENUE
+			FROM (SELECT [Collective Number], [Total Revenue], [2nd Order]  FROM #ORDERBOOK2 o WHERE [2nd Order] <> '#') o
+			LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED c
+				ON o.[2nd Order] = c.[Sales document]
+			WHERE
+			 c.Total is not null AND
+			o.[Collective Number] NOT LIKE '#' AND
+			c.Total <> 0) q
+			GROUP BY [Collective Number], OB_TOTAL_REVENUE, BW_TOTAL_REVENUE 
+
+
+DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED_COLLECTIVE_CHECK
+INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED_COLLECTIVE_CHECK
+
+SELECT 
+			[Sales document],
+			Collective_OB,
+			Collective_MATRIX as collective_BW,
+			Differing_amount,
+			Variance,
+			b.Variance_Indicator
+FROM #BWVARIANCE b
+JOIN #ORDERBOOK o 
+	ON o.[Collective Number] = b.[Collective Number]
+JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED k
+ ON k.ob_sales_document = o.[Sales document]
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------ COMPARISON QUERY ONLY - NOT USED IN PROCESS!!!! SHOWS ALL ORDERS FROM MATRIX_FINANCE_MATRIX_EXPORT, THEIR FINAL LOCATIONS AND REASONING
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+DELETE FROM fmp.FDT_MATRIX_CHECK_PROCESS_ORDER_LOCATIIONS
+INSERT INTO fmp.FDT_MATRIX_CHECK_PROCESS_ORDER_LOCATIIONS
+
+SELECT 
+	mfme.id as Matrix_ID,
+	mfme.ob_sales_document as Matrix_Sales_Document,
+	mfme.ob_2nd_order as Matrix_Second_Order,
+	o.[Collective Number] as Order_Book_Collective_Order,
+	mfme.vpe * mfme.rental_assignment as Matrix_Total_Revenue,
+	o.[Total Revenue] as Order_Book_Total_Revenue,
+	msoia.TOTAL as BW_Total_Revenue,
+	moc.Collective_MATRIX as Matrix_Collective_Total_Revenue,
+	moc.Collective_OB as Order_Book_Collective_Total_Revenue,
+	moc.Variance as Collective_Collective_Revenue_Check_Result,
+	bwci.[Differing Amount] as BW_Indicator_Value,
+	bwci.[Variance Indicator] as BW_Indicator,
+	obch.Approved as Manual_Aproval_OB_Matrix,
+	obch.[Date Approved] as Manual_Aproval_OB_Matrix_Date,
+
+	CASE 
+		WHEN mcr.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as INITIAL_CHECK_REPORT,
+	CASE 
+		WHEN cc.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as [2nd_CHECK_REPORT],
+	CASE 
+	WHEN bwn.ob_sales_document IS NOT NULL THEN 'Yes' 
+	ELSE '' 
+	END as NOT_ON_BW,
+	CASE 
+		WHEN bon.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as BW_OB_NOT_MATCH,
+	CASE 
+		WHEN nmcc.[Sales document] IS NOT NULL THEN nmcc.Variance_Indicator 
+		ELSE '' 
+		END as BW_OB_NOT_MATCH_COL_INDICATOR,
+	CASE 
+		WHEN f.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as GOOD_TO_GO
+
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfme
+LEFT JOIN #ORDERBOOK as o
+	ON CAST(mfme.ob_sales_document as INT) = CAST(o.[Sales document] as INT)
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as msoia
+	ON CAST(msoia.[Sales document] as INT) = CAST(mfme.ob_2nd_order as INT)
+LEFT JOIN #FULLVARIANCEINDICATOR as moc
+	ON moc.[Collective Number] = o.[Collective Number]
+LEFT JOIN fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH bwn
+	ON bwn.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT as mcr
+	ON mcr.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED as bon
+	ON bon.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN (SELECT * FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS WHERE approval = 'Approved') as f
+	ON f.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN #BWOBFINANCECHECKINDICATOR as bwci  
+	ON bwci.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC obch
+	ON obch.ob_2nd_order = mfme.ob_sales_document
+LEFT JOIN [fmp].[FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED_COLLECTIVE_CHECK] nmcc
+	ON nmcc.[Sales document] = mfme.ob_sales_document
+LEFT JOIN [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK] cc
+	ON cc.ob_sales_document = mfme.ob_sales_document
+GROUP By
+	mfme.id,
+	mfme.ob_sales_document,
+	mfme.ob_2nd_order,
+	o.[Collective Number],
+	mfme.vpe,
+	mfme.rental_assignment,
+	o.[Total Revenue],
+	msoia.TOTAL,
+	moc.Collective_MATRIX,
+	moc.Collective_OB,
+	moc.Variance,
+	bwci.[Differing Amount],
+	bwci.[Variance Indicator],
+	obch.Approved,
+	obch.[Date Approved] ,
+	bwn.ob_sales_document,
+	mcr.ob_sales_document,
+	bon.ob_sales_document,
+	f.ob_sales_document,
+	nmcc.[Sales document],
+	nmcc.Variance_Indicator,
+	cc.ob_sales_document 
+
+	DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_SUMMARY_STATS
+	INSERT INTO fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_SUMMARY_STATS
+
+	SELECT 
+		SUM(Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH) as Not_On_BW,
+		SUM(Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT) as Admin_Check,
+		SUM([2nd_CHECK_REPORT]) as [2nd_Admin_check],
+		SUM(Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED) as Finance_Check,
+		--SUM(BW_OB_NOT_MATCH_COL_INDICATOR) as Count_BW_OB_NOT_MATCH_COL_INDICATOR,
+		SUM(Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL) as Ready_For_upload
+	
+	FROM
+	(SELECT 
+	mfme.id as Matrix_ID,
+	mfme.ob_sales_document as Matrix_Sales_Document,
+	mfme.ob_2nd_order as Matrix_Second_Order,
+	o.[Collective Number] as Order_Book_Collective_Order,
+	mfme.vpe * mfme.rental_assignment as Matrix_Total_Revenue,
+	o.[Total Revenue] as Order_Book_Total_Revenue,
+	msoia.TOTAL as BW_Total_Revenue,
+	moc.Collective_MATRIX as Matrix_Collective_Total_Revenue,
+	moc.Collective_OB as Order_Book_Collective_Total_Revenue,
+	moc.Variance as Collective_Collective_Revenue_Check_Result,
+	bwci.[Differing Amount] as BW_Indicator_Value,
+	bwci.[Variance Indicator] as BW_Indicator,
+	obch.Approved as Manual_Aproval_OB_Matrix,
+	obch.[Date Approved] as Manual_Aproval_OB_Matrix_Date,
+	CASE 
+		WHEN bwn.ob_sales_document IS NOT NULL THEN 1 
+		ELSE 0 
+		END as Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH,
+	CASE 
+		WHEN mcr.ob_sales_document IS NOT NULL THEN 1 
+		ELSE 0 
+		END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT,
+			CASE 
+		WHEN cc.ob_sales_document IS NOT NULL THEN 1
+		ELSE 0 
+		END as [2nd_CHECK_REPORT],
+	CASE 
+		WHEN bon.ob_sales_document IS NOT NULL THEN 1
+		ELSE 0 
+		END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED,
+	CASE 
+		WHEN nmcc.[Sales document] IS NOT NULL THEN 1
+		ELSE 0 
+		END as BW_OB_NOT_MATCH_COL_INDICATOR,
+	CASE 
+		WHEN f.ob_sales_document IS NOT NULL THEN 1 
+		ELSE 0 
+		END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfme
+LEFT JOIN #ORDERBOOK as o
+	ON CAST(mfme.ob_sales_document as INT) = CAST(o.[Sales document] as INT)
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as msoia
+	ON CAST(msoia.[Sales document] as INT) = CAST(mfme.ob_2nd_order as INT)
+LEFT JOIN #FULLVARIANCEINDICATOR as moc
+	ON moc.[Collective Number] = o.[Collective Number]
+LEFT JOIN fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH bwn
+	ON bwn.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT as mcr
+	ON mcr.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED as bon
+	ON bon.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN (SELECT * FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS WHERE approval = 'Approved') as f
+	ON f.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN #BWOBFINANCECHECKINDICATOR as bwci  
+	ON bwci.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC obch
+	ON obch.ob_2nd_order = mfme.ob_sales_document
+LEFT JOIN [fmp].[FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED_COLLECTIVE_CHECK] nmcc
+	ON nmcc.[Sales document] = mfme.ob_sales_document
+LEFT JOIN [fmp].[MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK] cc
+	ON cc.ob_sales_document = mfme.ob_sales_document
+GROUP By
+	mfme.id,
+	mfme.ob_sales_document,
+	mfme.ob_2nd_order,
+	o.[Collective Number],
+	mfme.equipment_no,
+	mfme.vpe,
+	mfme.rental_assignment,
+	o.[Total Revenue],
+	msoia.TOTAL,
+	moc.Collective_MATRIX,
+	moc.Collective_OB,
+	moc.Variance,
+	bwci.[Differing Amount],
+	bwci.[Variance Indicator],
+	obch.Approved,
+	obch.[Date Approved] ,
+	bwn.ob_sales_document,
+	mcr.ob_sales_document,
+	bon.ob_sales_document,
+	f.ob_sales_document,
+	nmcc.[Sales document],
+	nmcc.Variance_Indicator,
+	cc.ob_sales_document ) as kd
+
+	SELECT
+	SUM(Count_Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH+Count_Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT+Count_Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED+Count_Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL) as Total,
+	(SELECT COUNT(*) FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT) as total_lines
+	FROM
+		(SELECT 
+			SUM(Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH) as Count_Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH,
+			SUM(Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT) as Count_Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT,
+			SUM(Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED) as Count_Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED,
+			SUM(Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL) as Count_Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+		FROM
+			(SELECT 
+			mfme.id as Matrix_ID,
+			mfme.ob_sales_document as Matrix_Sales_Document,
+			mfme.ob_2nd_order as Matrix_Second_Order,
+			o.[Collective Number] as Order_Book_Collective_Order,
+			mfme.vpe * mfme.rental_assignment as Matrix_Total_Revenue,
+			o.[Total Revenue] as Order_Book_Total_Revenue,
+			msoia.TOTAL as BW_Total_Revenue,
+			moc.Collective_MATRIX as Matrix_Collective_Total_Revenue,
+			moc.Collective_OB as Order_Book_Collective_Total_Revenue,
+			moc.Variance as Collective_Collective_Revenue_Check_Result,
+			bwci.[Differing Amount] as BW_Indicator_Value,
+			bwci.[Variance Indicator] as BW_Indicator,
+			obch.Approved as Manual_Aproval_OB_Matrix,
+			obch.[Date Approved] as Manual_Aproval_OB_Matrix_Date,
+			CASE 
+				WHEN bwn.ob_sales_document IS NOT NULL THEN 1 
+				ELSE 0 
+				END as Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH,
+			CASE 
+				WHEN mcr.ob_sales_document IS NOT NULL THEN 1 
+				ELSE 0 
+				END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT,
+			CASE 
+				WHEN bon.ob_sales_document IS NOT NULL THEN 1
+				ELSE 0 
+				END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED,
+			CASE 
+				WHEN f.ob_sales_document IS NOT NULL THEN 1 
+				ELSE 0 
+				END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+		FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfme
+		LEFT JOIN #ORDERBOOK as o
+			ON CAST(mfme.ob_sales_document as INT) = CAST(o.[Sales document] as INT)
+		LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as msoia
+			ON CAST(msoia.[Sales document] as INT) = CAST(mfme.ob_2nd_order as INT)
+		LEFT JOIN #FULLVARIANCEINDICATOR as moc
+			ON moc.[Collective Number] = o.[Collective Number]
+		LEFT JOIN fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH bwn
+			ON bwn.ob_sales_document = mfme.ob_sales_document
+		LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT as mcr
+			ON mcr.ob_sales_document = mfme.ob_sales_document
+		LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED as bon
+			ON bon.ob_sales_document = mfme.ob_sales_document
+		LEFT JOIN (SELECT * FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS WHERE approval = 'Approved') as f
+			ON f.ob_sales_document = mfme.ob_sales_document
+		LEFT JOIN #BWOBFINANCECHECKINDICATOR as bwci  
+			ON bwci.ob_sales_document = mfme.ob_sales_document
+		LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC obch
+			ON obch.ob_2nd_order = mfme.ob_sales_document
+		GROUP By
+			mfme.id,
+			mfme.ob_sales_document,
+			mfme.ob_2nd_order,
+			o.[Collective Number],
+			mfme.vpe,
+			mfme.rental_assignment,
+			o.[Total Revenue],
+			msoia.TOTAL,
+			moc.Collective_MATRIX,
+			moc.Collective_OB,
+			moc.Variance,
+			bwci.[Differing Amount],
+			bwci.[Variance Indicator],
+			obch.Approved,
+			obch.[Date Approved] ,
+			bwn.ob_sales_document,
+			mcr.ob_sales_document,
+			bon.ob_sales_document,
+			f.ob_sales_document) as kd) as dk
+
+SELECT
+	SUM(Variance_Indicator) as Collective_Matches,
+	COUNT(*) as Total_Rows
+FROM
+	(SELECT
+		[Collective Number],
+		SUM(OB_TOTAL_REVENUE) as Collective_OB,
+		SUM(MATRIX_TOTAL_REVENUE) as Collective_MATRIX,
+		ROUND(SUM(OB_TOTAL_REVENUE)/SUM(MATRIX_TOTAL_REVENUE),2) as Variance,
+		CASE
+			WHEN SUM(OB_TOTAL_REVENUE)/SUM(MATRIX_TOTAL_REVENUE) between 0.9 and 1.1 THEN 1
+			ELSE 0
+			End as Variance_Indicator
+	FROM
+		(SELECT
+			[Sales Document],
+			[Collective Number],
+			[Total Revenue] as OB_TOTAL_REVENUE,
+			c.Total as MATRIX_TOTAL_REVENUE
+		FROM #ORDERBOOK o
+		LEFT JOIN #FULLCCSORDERS c
+			ON o.[Sales Document] = c.ob_sales_document
+		WHERE c.Total is not null AND
+		[Collective Number] NOT LIKE '#' AND
+		c.Total <> 0) q
+	GROUP BY [Collective Number]) d
+
+SELECT * FROM (
+SELECT 
+	mfme.id as Matrix_ID,
+	mfme.ob_sales_document as Matrix_Sales_Document,
+	mfme.ob_2nd_order as Matrix_Second_Order,
+	o.[Collective Number] as Order_Book_Collective_Order,
+	mfme.vpe * mfme.rental_assignment as Matrix_Total_Revenue,
+	o.[Total Revenue] as Order_Book_Total_Revenue,
+	msoia.TOTAL as BW_Total_Revenue,
+	moc.Collective_MATRIX as Matrix_Collective_Total_Revenue,
+	moc.Collective_OB as Order_Book_Collective_Total_Revenue,
+	moc.Variance as Collective_Collective_Revenue_Check_Result,
+	bwci.[Differing Amount] as BW_Indicator_Value,
+	bwci.[Variance Indicator] as BW_Indicator,
+	obch.Approved as Manual_Aproval_OB_Matrix,
+	obch.[Date Approved] as Manual_Aproval_OB_Matrix_Date,
+	CASE 
+		WHEN bwn.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH,
+	CASE 
+		WHEN mcr.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT,
+	CASE 
+		WHEN bon.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED,
+	CASE 
+		WHEN f.ob_sales_document IS NOT NULL THEN 'Yes' 
+		ELSE '' 
+		END as Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL
+FROM fmp.MATRIX_FINANCE_MATRIX_EXPORT as mfme
+LEFT JOIN #ORDERBOOK as o
+	ON CAST(mfme.ob_sales_document as INT) = CAST(o.[Sales document] as INT)
+LEFT JOIN #MATRIX_SALES_ORDERS_INVOICED_AMOUNT_REVISED as msoia
+	ON CAST(msoia.[Sales document] as INT) = CAST(mfme.ob_2nd_order as INT)
+LEFT JOIN #FULLVARIANCEINDICATOR as moc
+	ON moc.[Collective Number] = o.[Collective Number]
+LEFT JOIN fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH bwn
+	ON bwn.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT as mcr
+	ON mcr.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED as bon
+	ON bon.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN (SELECT * FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS WHERE approval = 'Approved')  as f
+	ON f.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN #BWOBFINANCECHECKINDICATOR as bwci  
+	ON bwci.ob_sales_document = mfme.ob_sales_document
+LEFT JOIN fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC obch
+	ON obch.ob_2nd_order = mfme.ob_sales_document
+GROUP By
+	mfme.id,
+	mfme.ob_sales_document,
+	mfme.ob_2nd_order,
+	o.[Collective Number],
+	mfme.vpe,
+	mfme.rental_assignment,
+	o.[Total Revenue],
+	msoia.TOTAL,
+	moc.Collective_MATRIX,
+	moc.Collective_OB,
+	moc.Variance,
+	bwci.[Differing Amount],
+	bwci.[Variance Indicator],
+	obch.Approved,
+	obch.[Date Approved] ,
+	bwn.ob_sales_document,
+	mcr.ob_sales_document,
+	bon.ob_sales_document,
+	f.ob_sales_document)s
+WHERE Present_On_FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH LIKe '' AND
+Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT LIKE '' AND
+Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED like '' AND
+Present_On_FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL like ''
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------ TBC ----------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDERBOOK_CHECK_HISTORIC
+--DELETE FROM fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_BW_OB_CHECK_FILE_HISTORIC
+--DELETE FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_HISTORIC 
+--DELETE FROM fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH_HISTORIC	
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------ COMPARISON QUERY ONLY - NOT USED IN PROCESS!!!! Count of Orders FROM ORDERBOOK associated to a Collective Order Number ----------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--SELECT * FROM #MATRIXCOLLORDER
+
+--select 
+--		COB.Collective_Sales_Doc,
+--		count(COB.collective_sales_doc) as Count_Of_Coll_Sales_Doc
+--from
+--		base.COMMISSIONS_OB AS COB
+--JOIN	
+--		#MATRIXCOLLORDER AS MCO
+--		ON MCO.COLLECTIVE_SALES_DOC = COB.COLLECTIVE_SALES_DOC
+--GROUP BY
+--		COB.Collective_Sales_Doc
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------ COMPARISON QUERY ONLY - NOT USED IN PROCESS!!!! SELECT * FROM'S
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---COMPARISON QUERY ONLY - NOT USED IN PROCESS!!!! UNION QUERY TO TEST NO LINES HAVE BEEN LOST 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+This is the start of matrix weekly checks
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+
+INSERT INTO [fmp].[MATRIX_DATED_DEVICE_LIST_ADMIN_REPORT_1]
+SELECT 
+		GETDATE() as [Report_Date]
+      ,[es_id]
+      ,[sales_doc]
+      ,[district]
+      ,[bus_type]
+      ,[framework]
+      ,[sold_to]
+      ,[main_material]
+      ,[equipment]
+      ,[framework_match]
+      ,[funding_match]
+      ,[rental_match]
+      ,[term_match]
+      ,[click_match]
+      ,[Traffic Light]
+      ,[DEVICE_LIST? on/off]
+  FROM fmp.MATRIX_ADMIN_REPORT_1
+
+-----------------------------------------------
+
+SELECT
+	es_id,
+	DATEDIFF(day,CAST(MIN(Report_Date) as DATE),GETDATE())/7 as WEEKAGE
+	INTO #AGEOFESIDS
+FROM fmp.MATRIX_DATED_DEVICE_LIST_ADMIN_REPORT_1
+WHERE es_id is not null
+GROUP BY es_id
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+THIS SECTION BETWEEN THE STARS CREATES MATRIX MATCH FAILURE REPORT
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+
+---------------------------------------------------------------------------------------------------------------------------
+--CREATES TABLE #NOTNEW which applies an age in days from todays date to all items in the historic matchfailure report
+---------------------------------------------------------------------------------------------------------------------------
+
+DECLARE @DATE DATE	
+SET @DATE = GETDATE()
+
+SELECT
+	id,
+	Report_Date,
+	DATEDIFF(day,Report_Date,@DATE) as [Difference]
+INTO #NOTNEW
+FROM fmp.MATRIX_DATED_MI_MATCH_FAILURE_REPORT
+GROUP BY ID, Report_Date
+
+-----------------------------------------------------------------------------------------------------------------------------
+--CREATES TABLE #NOTNEW of all ids which have a date in the historic less than 30 days ago to be classed as
+-----------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	id,
+	MAX(Report_Date) as Report_Date
+	INTO #GAPCHECKS
+FROM #NOTNEW
+WHERE Difference <30
+GROUP BY ID
+
+-----------------------------------------------------------------------------------------------------------------------------
+--TABLE CREATED - #DIFFASSIGNED has the difference between dates in the historic assigng
+-----------------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	mfr.id,
+	mfr.Report_Date,
+	DATEDIFF(DAY,LEAD(MAX(mfr.REPORT_DATE),1) OVER(ORDER BY mfr.ID, mfr.report_date desc),MAX(mfr.REPORT_DATE)) as DIFF1
+	INTO #DIFFASSIGNED
+FROM fmp.MATRIX_DATED_MI_MATCH_FAILURE_REPORT as mfr
+JOIN #GAPCHECKS as GC
+	ON GC.ID = mfr.id
+WHERE mfr.ID IS NOT NULL AND GC.ID IS NOT NULL
+GROUP BY mfr.ID, mfr.Report_Date
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+--CREATED REPORT - #DIFFGREATERTHAN30 which shows all ids with a reporting gap greater than 30. 
+-----------------------------------------------------------------------------------------------------------------------------
+
+
+SELECT
+	ID,
+	REPORT_Date,
+	DIFF1
+	INTO #DIFFGREATERTHAN30
+FROM #DIFFASSIGNED
+WHERE DIFF1 >30
+
+-----------------------------------------------------------------------------------------------------------------
+--CREATED TABLE #NEWENTRIES WHICH SHOWS ALL ITEMS WHICH SHOW on MATRIX MATCH FAILURE THAT DO NOT SHOw on historic
+-----------------------------------------------------------------------------------------------------------------
+
+
+--DECLARE @DATE DATE	
+--SET @DATE = GETDATE()
+
+SELECT * INTO #NEWENTRIES FROM (
+SELECT
+	mmf.ID,
+	GETDATE() as Report_Date,
+	0 as 'Age'
+FROM fmp.MATRIX_MATCH_FAILURE as mmf
+LEFT JOIN fmp.MATRIX_DATED_MI_MATCH_FAILURE_REPORT as dmfr
+	ON mmf.id = dmfr.id
+WHERE dmfr.id IS NULL
+UNION ALL
+SELECT
+	mmf.ID,
+	GETDATE() as Report_Date,
+	0 as 'Age'
+FROM fmp.MATRIX_MATCH_FAILURE as mmf
+LEFT JOIN fmp.MATRIX_DATED_MI_MATCH_FAILURE_REPORT as dmfr
+	ON mmf.id = dmfr.id
+GROUP BY mmf.id
+HAVING DATEDIFF(DAY,MAX(Report_Date),GETDATE())/7 > 6) ks
+
+
+
+-------------------------------------------------------------------------------------------------------------------
+--CREATED TABLE #NEVERHADABREAK where match failure items do not appear on difference greater than 30 report with their
+--minimum report date as per dated match failure 
+-------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	mmf.ID,
+	MIN(dmmf.Report_Date) as oldest_report_date
+	INTO #NEVERHADABREAK
+FROM fmp.MATRIX_MATCH_FAILURE as mmf
+LEFT JOIN #DIFFGREATERTHAN30 as dgt30
+	ON mmf.id = dgt30.id
+LEFT JOIN fmp.MATRIX_DATED_MI_MATCH_FAILURE_REPORT as dmmf
+	on mmf.id = dmmf.id
+LEFT JOIN #NEWENTRIES ne
+	on ne.id = mmf.id
+WHERE dgt30.id is null
+AND ne.id is null
+GROUP BY mmf.id
+
+----------------------------------------------------------------------------------------------------------------------
+--CREATED TABLE #REPORTDATEFORGAPS which shows the report date for the those that are not new that have a gap.
+----------------------------------------------------------------------------------------------------------------------
+
+SELECT
+	dgt30.ID,
+	MAX(dgt30.Report_Date) as Report_Date
+	INTO #REPORTDATEFORGAPS
+FROM #DIFFGREATERTHAN30 dgt30
+JOIN fmp.MATRIX_MATCH_FAILURE as mmf
+	ON dgt30.id = mmf.id
+WHERE mmf.id IS NOT NULL
+GROUP BY dgt30.ID
+
+-----------------------------------------------------------------------------------------------------------------------
+--CREATES TABLE #FINALAGE which is the final list of IDs for MATCH FAILURE REPORT with their age in weeks
+-----------------------------------------------------------------------------------------------------------------------
+
+--DECLARE @DATE DATE	
+--SET @DATE = GETDATE()
+
+SELECT * INTO #FINALAGE 
+FROM(
+SELECT
+	ID,
+	Report_Date,
+	Age
+FROM #NEWENTRIES
+	UNION ALL
+		SELECT
+			ID,
+			GETDATE () as Report_Date,
+			DATEDIFF(day,oldest_report_date,GETDATE())/7 as Age
+		FROM #NEVERHADABREAK
+			UNION ALL
+				SELECT
+					ID,
+					GETDATE() as Report_Date,
+					DATEDIFF(DAY,Report_Date,GETDATE())/7 as Age
+				FROM #REPORTDATEFORGAPS
+				) as tmp
+-----------------------------------------------------------------------------------------------------------
+--CREATES TABLE ** WHICH IS THE FINAL TABLE FOR MATCHFAILURE
+-----------------------------------------------------------------------------------------------------------
+
+--DECLARE @DATE DATE	
+--SET @DATE = GETDATE()
+
+SELECT
+	'MI - MATCH FAILURE REPORT' as Report,
+	GETDATE() as Report_Date,
+	mmf.[Equipment Number],
+	mmf.[Billing Name],
+	mmf.[Serial Number],
+	FA.Age,
+	mmf.id
+INTO #MATCHFAILUREFINAL
+FROM.fmp.MATRIX_MATCH_FAILURE as mmf
+LEFT JOIN #FINALAGE as FA
+	ON mmf.id = FA.id
+
+
+
+INSERT INTO fmp.MATRIX_DATED_MI_MATCH_FAILURE_REPORT
+SELECT GETDATE() as REport_date, * FROM fmp.MATRIX_MATCH_FAILURE
+
+
+/****************************************************************************************************************************
+***************************************************************************************************************************/
+--END OF MATCH FAILURE REPORT
+/****************************************************************************************************************************
+***************************************************************************************************************************/
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+-----------GENERATES LOMNOV-------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Delete From fmp.FDT_MATRIX_LOMNOV
+insert INTO fmp.FDT_MATRIX_LOMNOV
+
+SELECT
+	dlid,
+	equipment_no,
+	name_bill_to,
+	serial_number,
+	sales_document,
+	framework_partner,
+	contract_start,
+	vpe,
+	end_date,
+	reporting_status,
+	month_added,
+	[Matching Status],
+	[Weeks Outstanding],
+	[Length Outstanding]
+	FROM (
+SELECT
+	m.dlid,
+	m.equipment_no,
+	m.name_bill_to,
+	m.serial_number,
+	m.sales_document,
+	m.framework_partner,
+	m.contract_start,
+	m.vpe,
+	m.end_date,
+	m.reporting_status,
+	m.month_added,
+	m.[Matching Status],
+	CASE
+		WHEN d.Report_Date is null THEN 0
+		ELSE DATEDIFF(day,CAST(MIN(d.Report_Date) as DATE),GETDATE())/7 
+			END as [Weeks Outstanding]
+		,CASE 
+			WHEN d.Report_Date IS null then 'NEW'
+			WHEN datediff(day,CAST(MIN(d.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(d.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding]
+FROM fmp.MATRIX_MI_REPORT_one as m
+LEFT JOIN base.RAW_ZDSVERT as v
+	ON m.equipment_no = v.Equipment
+LEFT JOIN fmp.FDT_MATRIX_LOMNOV_DATED d
+	on m.dlid = d.dlid
+WHERE 
+	m.equipment_no <> 12345678  and
+	m.reporting_status <> 'NEW' and
+	v.Equipment is null and
+	(m.end_date = 0000-00-00 or 
+	m.end_date Is NULL)
+GROUP BY 
+	m.dlid,
+	m.equipment_no,
+	m.name_bill_to,
+	m.serial_number,
+	m.sales_document,
+	m.framework_partner,
+	m.contract_start,
+	m.vpe,
+	m.end_date,
+	m.reporting_status,
+	m.month_added,
+	m.[Matching Status],
+	d.Report_Date) kd
+GROUP BY
+	dlid,
+	equipment_no,
+	name_bill_to,
+	serial_number,
+	sales_document,
+	framework_partner,
+	contract_start,
+	vpe,
+	end_date,
+	reporting_status,
+	month_added,
+	[Matching Status],
+	[Weeks Outstanding],
+	[Length Outstanding]
+
+INSERT INTO fmp.FDT_MATRIX_LOMNOV_DATED
+
+SELECT
+	GETDATE() as Report_Date, 
+	m.dlid,
+	m.equipment_no,
+	m.name_bill_to,
+	m.serial_number,
+	m.sales_document,
+	m.framework_partner,
+	m.contract_start,
+	m.vpe,
+	m.end_date,
+	m.reporting_status,
+	m.month_added,
+	m.[Matching Status]
+ FROM fmp.FDT_MATRIX_LOMNOV m
+
+ DELETE FROM fmp.FDT_MATRIX_LOMNOV_EXPORT
+ INSERT INTO fmp.FDT_MATRIX_LOMNOV_EXPORT
+
+ SELECT
+	dlid,
+	equipment_no,
+	name_bill_to,
+	serial_number,
+	sales_document,
+	framework_partner,
+	contract_start,
+	vpe,
+	end_date,
+	reporting_status,
+	month_added,
+	[Matching Status]
+FROM fmp.FDT_MATRIX_LOMNOV
+group by 
+	dlid,
+	equipment_no,
+	name_bill_to,
+	serial_number,
+	sales_document,
+	framework_partner,
+	contract_start,
+	vpe,
+	end_date,
+	reporting_status,
+	month_added,
+	[Matching Status]
+--------------------------------
+
+DELETE FROM fmp.FDT_MATRIX_WEEKLY_REPORTS
+INSERT INTO fmp.FDT_MATRIX_WEEKLY_REPORTS
+
+
+
+SELECT *   FROM (
+SELECT
+	'1st Admin Checks' as [Status]
+	,ID
+	,OB_sales_document
+	,equipment_no
+	,OB_main_material
+	,cont_name_Sold_to
+	,ob_doc_date
+	,[Length Outstanding]
+	,[Weeks Outstanding]
+FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT
+UNION ALL
+SELECT
+	'2nd Admin Checks' as [Status]
+	,ID
+	,OB_sales_document
+	,equipment_no
+	,OB_main_material
+	,cont_name_Sold_to
+	,ob_doc_date
+	,[Length Outstanding]
+	,[Weeks Outstanding]
+FROM fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK
+UNION ALL
+SELECT 
+	'LOMNOV' as [Status]
+	,dlid
+	,sales_document
+	,equipment_no
+	,'' material
+	,name_bill_to
+	,'' as Document_Date
+	,[length outstanding]
+	,[Weeks Outstanding]
+FROM fmp.FDT_MATRIX_LOMNOV
+UNION ALL
+SELECT
+	'Not on BW' as [Status]
+	,ID
+	,OB_sales_document
+	,equipment_no
+	,OB_main_material
+	,cont_name_Sold_to
+	,ob_doc_date
+	,CASE 
+			WHEN datediff(day,CAST(MIN(ed.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding]
+	,datediff(day,CAST(MIN(ed.report_date) AS DATE),getdate())/7 AS [Weeks Outstanding]
+FROM fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH as bwnm
+LEFT JOIN
+		fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED as ed
+		on ed.es_id = bwnm.id
+GROUP BY
+		bwnm.id
+		,ob_sales_document
+		,equipment_no
+		,ob_main_material
+		,cont_name_sold_to
+		,ob_doc_date
+
+UNION ALL
+SELECT
+	'Finance Checks' as [Status]
+	,ID
+	,OB_sales_document
+	,equipment_no
+	,OB_main_material
+	,cont_name_Sold_to
+	,ob_doc_date
+	,[Length Outstanding]
+	,[Weeks Outstanding]
+FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED
+UNION ALL
+SELECT
+	'Ready To Report' as [Status]
+	,ID
+	,OB_sales_document
+	,equipment_no
+	,OB_main_material
+	,cont_name_Sold_to
+	,ob_doc_date
+	,CASE 
+			WHEN datediff(day,CAST(MIN(ed.report_date) as date),getdate())/7 < 1 THEN 'NEW'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 1 THEN '1 Week'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 2 THEN '2 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 3 THEN '3 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 = 4 THEN '4 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN datediff(day,cast(MIN(ed.report_date) as date),getdate())/7 between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS [Length Outstanding]
+	,ROUND(datediff(day,CAST(MIN(ed.report_date) AS DATE),getdate())/7,0) AS [Weeks Outstanding]
+FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS nd
+LEFT JOIN
+		fmp.FDT_MATRIX_FINANCE_MATRIX_EXPORT_DATED ed
+		on ed.es_id = nd.id
+WHERE Approval = 'Approved'
+GROUP BY
+		nd.id
+		,ob_sales_document
+		,equipment_no
+		,ob_main_material
+		,cont_name_sold_to
+		,ob_doc_date
+UNION ALL
+SELECT
+	'Matrix 1 checks' as [Status],
+	ar1.es_id,
+	ar1.sales_doc,
+	ar1.equipment,
+	ar1.main_material,
+	o.[Customer name] as cont_name_Sold_to,
+	o.[Document Date] as ob_doc_date,
+	CASE 
+			WHEN aoe.weekage < 1  THEN 'NEW'
+			WHEN aoe.weekage IS null  THEN 'NEW'
+			WHEN aoe.weekage = 1 THEN '1 Week'
+			WHEN aoe.weekage = 2 THEN '2 Weeks'
+			WHEN aoe.weekage = 3 THEN '3 Weeks'
+			WHEN aoe.weekage = 4 THEN '4 Weeks'
+			WHEN aoe.weekage between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN aoe.weekage between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN aoe.weekage between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN aoe.weekage between 41 and 52 THEN '41 - 52 Weeks'
+				ELSE '52+ Weeks'
+					END AS [Length Outstanding],
+	CASE
+		WHEN aoe.weekage IS null then 0
+			ELSE aoe.weekage
+				END as [Weeks Outstanding]
+FROM fmp.MATRIX_ADMIN_REPORT_1 as ar1
+LEFT JOIN #AGEOFESIDS as aoe
+	ON aoe.es_id = ar1.es_id
+LEFT JOIN base.commissions_ob o 
+	on o.[Sales document] = ar1.sales_doc
+WHERE cast(ar1.es_id as int)  not in (SELECT DISTINCT	
+											 cast(ID as int) as ID
+										FROM (
+
+										SELECT
+											ID
+										FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_CHECK_REPORT
+										UNION ALL
+										SELECT
+											ID
+										FROM fmp.MATRIX_FINANCE_CHECK_PROCESS_MATRIX_ORDER_BOOK_2ND_CHECK
+										UNION ALL
+										SELECT
+											ID
+										FROM fmp.FDT_MATIRX_FINANCE_CHECK_BW_CHECK_NOT_MATCH
+										UNION ALL
+										SELECT
+											ID
+										FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_BW_OB_NOT_MATCHED
+										UNION ALL
+										SELECT
+											ID
+										FROM fmp.FDT_MATRIX_FINANCE_CHECK_PROCESS_FINAL_NO_DUPS) s where ID is not null )
+GROUP BY 
+	ar1.es_id,
+	ar1.sales_doc,
+	ar1.equipment,
+	ar1.main_material,
+	o.[Customer name],
+	o.[Document Date],
+	aoe.weekage 
+UNION ALL
+SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'2 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'1 week' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'3 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'4 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'5 - 10 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'11 - 20 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'21 - 40 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'41 - 52 weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+	SELECT
+	'Field name' as [Status]
+	,'' as ID
+	,'' as OB_sales_document
+	,'' as equipment_no
+	,'' as OB_main_material
+	,'' as cont_name_Sold_to
+	,'' as ob_doc_date
+	,'52+ weeks' as [Length Outstanding]
+	,'' as [Weeks Outstanding]
+	UNION ALL
+SELECT 
+		*
+--INTO 
+--		#COMBINEDREPORTS
+FROM
+		(	
+SELECT
+		'Match Failure' as [Status],
+		mm.id,
+		MAX(o.[Sales document]) [Sales document],
+		mm.[Equipment Number],
+		mmf.[Main Material],
+		mm.[Billing Name],
+		MAX(o.[Document Date]) [Document Date],
+		CASE 
+			WHEN Age < 1 THEN 'NEW'
+			WHEN Age = 1 THEN '1 Week'
+			WHEN Age = 2 THEN '2 Weeks'
+			WHEN Age = 3 THEN '3 Weeks'
+			WHEN Age = 4 THEN '4 Weeks'
+			WHEN Age between 5 and 10 THEN '5 - 10 Weeks'
+			WHEN Age between 11 and 20 THEN '11 - 20 Weeks'
+			WHEN Age between 21 and 40 THEN '21 - 40 Weeks'
+			WHEN Age between 41 and 52 THEN '41 - 52 Weeks'
+			ELSE '52+ Weeks'
+			END AS Age_Grouping,
+		Age
+FROM	
+			#MATCHFAILUREFINAL mm
+LEFT JOIN fmp.MATRIX_MATCH_FAILURE mmf
+	ON mmf.id = mm.[id]
+LEFT JOIN (SELECT * FROM base.commissions_ob WHERE [Equipment] not like '#') o
+	on mm.[equipment Number] = o.[Equipment]
+GROUP BY
+		mm.id,
+		mm.[Equipment Number],
+		mmf.[Main Material],
+		mm.[Billing Name],
+		Age) kd )dk
+	
+
+
+
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+-----------GENERATES AGED GROUPING FOR MATCH FAILURE-------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+--------------------------------
+insert INTO [ fmp].[FDT_MATRIX_WEEKLY_REPORTS_SUMMARY]
+
+SELECT
+	CAST(GETDATE() as date) as Report_Date,
+	[Status],
+	COUNT(*) Number
+from fmp.FDT_MATRIX_WEEKLY_REPORTS K
+--WHERE @RUN = 'Yes'
+GROUP by [Status]
+
+
+
+
+SELECT TOP 2 Report_Date INTO #DATES FROM  [ fmp].[FDT_MATRIX_WEEKLY_REPORTS_SUMMARY]
+GROUP BY Report_DAte 
+ORDER BY Report_Date DESC
+
+DELETE FROM fmp.FDT_MATRIX_WEEKLY_REPORTS_SUMMARY_FINAL
+INSERT INTO  fmp.FDT_MATRIX_WEEKLY_REPORTS_SUMMARY_FINAL
+
+SELECT k.Report_Date, k.[Status], k.Number  FROM [ fmp].[FDT_MATRIX_WEEKLY_REPORTS_SUMMARY] k
+JOIN #DATES s 
+	ON K.Report_DAte  = s.Report_DAte
+GROUP BY k.Report_Date, k.[Status], k.Number 
+
+/***************************************************************************************************************************
+****************************************************************************************************************************
+end of weekly checks
+****************************************************************************************************************************
+***************************************************************************************************************************/
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+-----------GENERATES LOVNOM-------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+	SELECT
+	v.Equipment,
+	v.Name_Bill_To,
+	v.Contract_Start,
+	v.Contract_Val_Period,
+	v.Contract_End,
+	v.Framework_Partner,
+	CAST(RIGHT(v.Contract_Start,4) as INT) AS 'Contract_Year',
+	CAST(LEFT(RIGHT(v.Contract_Start,7),2) as INT) AS 'Contract_Month',
+	v.Serial_Number,
+	v.Equipment_Description,
+	v.Contract_Type,
+	v.Order_Reason,
+	CAST(RIGHT(v.Contract_Start,4) + LEFT(RIGHT(V.Contract_Start,7),2) as nvarchar(7)) AS 'Contract_Year_Month'
+FROM base.RAW_ZDSVERT as v
+LEFT JOIN fmp.MATRIX_FINANCE_REPORT_8 as fr8
+	ON v.Equipment = fr8.equipment
+LEFT JOIN fmp.MATRIX_MI_REPORT_ONE as mr1
+	ON v.Equipment = mr1.equipment_no
+LEFT JOIN fmp.MATRIX_ADMIN_REPORT_1 as ar1
+	ON v.Equipment = ar1.equipment
+LEFT JOIN fmp.MATRIX_FINANCE_MATRIX_EXPORT as ar2
+	ON v.Equipment = ar2.equipment_no
+--LEFT JOIN fmp.MATRIX_ADMIN_REPORT_3 as ar3
+--	ON v.Equipment = ar3.equipment
+LEFT JOIN fmp.MATRIX_ADMIN_REPORT_4 as ar4
+	ON v.Equipment = ar4.equipment
+WHERE 
+	v.Equipment IS NOT NULL AND
+	v.Contract_Val_Period IS NOT NULL AND
+	v.Contract_End = '00.00.0000' AND
+	(v.Framework_Partner = 'FMP-GPS' OR
+	v.Framework_Partner = 'FMP-RM3781' OR
+	v.Framework_Partner = 'FMP-3781L3' OR
+	v.Framework_Partner = 'FMP-GPS3' OR
+	v.Framework_Partner = 'FMP-OGC') AND
+	(v.Serial_Number NOT LIKE '%SOFTWARE%' AND
+	v.Serial_Number NOT LIKE '%ANCIL%' AND
+	v.Serial_Number NOT LIKE '%SOLUTION%' AND
+	V.Serial_Number NOT LIKE '%SADDLE%') AND
+	(V.Equipment_Description NOT LIKE '%FINISHER%' AND
+	V.Equipment_Description NOT LIKE '%PSSG%' AND
+	V.Equipment_Description NOT LIKE '%KIT%' AND
+	V.Equipment_Description NOT LIKE '%F. div%' AND
+	V.Equipment_Description NOT LIKE '%EPSON%' AND
+	V.Equipment_Description NOT LIKE '%SCAN%' AND
+	V.Equipment_Description NOT LIKE '%SAFEQ%' AND
+	V.Equipment_Description NOT LIKE '%SETTLEMENT%' AND
+	V.Equipment_Description NOT LIKE '%FAXBOARD%' AND
+	V.Equipment_Description NOT LIKE '%IOPTIONS%' AND
+	V.Equipment_Description NOT LIKE '%EYESOFT%' AND
+	V.Equipment_Description NOT LIKE 'CARDREADER%' AND
+	V.Equipment_Description NOT LIKE '%Safecom%' AND
+	V.Equipment_Description NOT LIKE '%SOLUTION%' AND
+	V.Equipment_Description NOT LIKE 'PCounter%' AND
+	V.Equipment_Description NOT LIKE '%FIERY%') AND
+	MR1.equipment_no IS NULL AND
+	ar1.equipment IS NULL AND
+	AR2.equipment_no IS NULL AND
+	--AR3.equipment IS NULL AND
+	AR4.equipment IS NULL AND
+	FR8.equipment IS NULL
+ORDER BY
+	Contract_Year ASC,
+	Contract_Month ASC

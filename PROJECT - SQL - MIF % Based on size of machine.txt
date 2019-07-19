@@ -1,0 +1,242 @@
+select
+	Short_Postcode
+	,[1 device]
+	,cast([1 device] as float) / cast(Total_Customers as float) as [% 1 device]
+	,[2 devices]
+	,cast([2 devices] as float) / cast(Total_Customers as float) as [% 2 devices]
+	,[3 devices]
+	,cast([3 devices] as float) / cast(Total_Customers as float) as [% 3 devices]
+	,[4 devices]
+	,cast([4 devices] as float) / cast(Total_Customers as float) as [% 4 devices]
+	,[5+ devices]
+	,cast([5+ devices] as float) / cast(Total_customers as float) as [% 5+ devices]
+	,Total_Customers
+from (
+		select 
+			a.short_postcode
+			,case when [1 device] is null then 0 else [1 device] end as [1 device]
+			,case when [2 devices] is null then 0 else [2 devices] end as [2 devices]
+			,case when [3 devices] is null then 0 else [3 devices] end as [3 devices]
+			,case when [4 Devices] is null then 0 else [4 Devices] end as [4 devices]
+			,case when [5+ Devices] is null then 0 else [5+ Devices] end as [5+ devices]
+			,case when [1 device] is null then 0 
+					else [1 device]
+						end + case when [2 devices] is null then 0
+										else [2 devices] 
+											end + case when [3 devices] is null then 0 
+															else [3 devices]
+																end + case when [4 devices] is null then 0 
+																				else [4 devices]
+																					end + case when [5+ Devices] is null then 0
+																									else [5+ Devices] 
+																										end as Total_Customers
+		from (
+				SELECT
+					a.Short_Postcode
+					,count(a.Short_Postcode) as [1 Device]
+				FROM (
+						SELECT 
+							Short_Postcode
+							,HierarchyName
+							,count(HierarchyName) as [number of devices]
+						from (
+								SELECT 
+									  [Contract_Start]
+									  ,[Contract_Val_Period]
+									  ,[Contract_Type]
+									  ,a.[Equipment]
+									  ,[Serial_Number]
+									  ,[Equipment_Description]
+									  ,[Street]
+									  ,[City]
+									  ,[Postal_Code]
+									  ,case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end as Short_Postcode
+									  ,CASE WHEN [Sales_Group] = 409 THEN 'London'
+											WHEN [Sales_Group] = 411 THEN 'Basildon'
+												ELSE 'Error'
+													End as [Office]
+									  ,'Private Sector SME' as [Buiness Unit]
+									  ,b.HierarchyName
+								  FROM [base].[RAW_ZDSVERT] a
+								  left join [mi].[HierarchyDataFinal] b
+										 on a.Equipment = b.Equipment
+								  where Sales_District = 4024
+										/*and sales_group in (409,411)*/
+										and case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end in ('CM','CO','CB','SS','IP','NR','IG','RM','WC','EC','E','SE','SW','W','NW','N','E','TN','ME','CT','DA','BR')
+							) a
+						group by 
+							Short_Postcode
+							,HierarchyName
+					) a
+				where [number of devices] = 1
+				group by Short_Postcode
+			) a
+		LEFT JOIN (
+					SELECT
+						a.Short_Postcode
+						,count(a.Short_Postcode) as [2 Devices]
+					FROM (
+							SELECT 
+								Short_Postcode
+								,HierarchyName
+								,count(HierarchyName) as [number of devices]
+							from (
+									SELECT 
+										  [Contract_Start]
+										  ,[Contract_Val_Period]
+										  ,[Contract_Type]
+										  ,a.[Equipment]
+										  ,[Serial_Number]
+										  ,[Equipment_Description]
+										  ,[Street]
+										  ,[City]
+										  ,[Postal_Code]
+										  ,case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end as Short_Postcode
+										  ,CASE WHEN [Sales_Group] = 409 THEN 'London'
+												WHEN [Sales_Group] = 411 THEN 'Basildon'
+													ELSE 'Error'
+														End as [Office]
+										  ,'Private Sector SME' as [Buiness Unit]
+										  ,b.HierarchyName
+									  FROM [base].[RAW_ZDSVERT] a
+									  left join [mi].[HierarchyDataFinal] b
+											 on a.Equipment = b.Equipment
+									  where Sales_District = 4024
+											/*and sales_group in (409,411)*/
+											and case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end in ('CM','CO','CB','SS','IP','NR','IG','RM','WC','EC','E','SE','SW','W','NW','N','E','TN','ME','CT','DA','BR')
+								) a
+							group by 
+								Short_Postcode
+								,HierarchyName
+						) a
+					where [number of devices] = 2
+					group by Short_Postcode
+				) b
+		on a.Short_Postcode = b.Short_Postcode
+		LEFT JOIN (
+					SELECT
+						a.Short_Postcode
+						,count(a.Short_Postcode) as [3 Devices]
+					FROM (
+							SELECT 
+								Short_Postcode
+								,HierarchyName
+								,count(HierarchyName) as [number of devices]
+							from (
+									SELECT 
+										  [Contract_Start]
+										  ,[Contract_Val_Period]
+										  ,[Contract_Type]
+										  ,a.[Equipment]
+										  ,[Serial_Number]
+										  ,[Equipment_Description]
+										  ,[Street]
+										  ,[City]
+										  ,[Postal_Code]
+										  ,case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end as Short_Postcode
+										  ,CASE WHEN [Sales_Group] = 409 THEN 'London'
+												WHEN [Sales_Group] = 411 THEN 'Basildon'
+													ELSE 'Error'
+														End as [Office]
+										  ,'Private Sector SME' as [Buiness Unit]
+										  ,b.HierarchyName
+									  FROM [base].[RAW_ZDSVERT] a
+									  left join [mi].[HierarchyDataFinal] b
+											 on a.Equipment = b.Equipment
+									  where Sales_District = 4024
+											/*and sales_group in (409,411)*/
+											and case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end in ('CM','CO','CB','SS','IP','NR','IG','RM','WC','EC','E','SE','SW','W','NW','N','E','TN','ME','CT','DA','BR')
+								) a
+							group by 
+								Short_Postcode
+								,HierarchyName
+						) a
+					where [number of devices] = 3
+					group by Short_Postcode
+				) c
+		on a.Short_Postcode = c.Short_Postcode
+		LEFT JOIN (
+					SELECT
+						a.Short_Postcode
+						,count(a.Short_Postcode) as [4 Devices]
+					FROM (
+							SELECT 
+								Short_Postcode
+								,HierarchyName
+								,count(HierarchyName) as [number of devices]
+							from (
+									SELECT 
+										  [Contract_Start]
+										  ,[Contract_Val_Period]
+										  ,[Contract_Type]
+										  ,a.[Equipment]
+										  ,[Serial_Number]
+										  ,[Equipment_Description]
+										  ,[Street]
+										  ,[City]
+										  ,[Postal_Code]
+										  ,case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end as Short_Postcode
+										  ,CASE WHEN [Sales_Group] = 409 THEN 'London'
+												WHEN [Sales_Group] = 411 THEN 'Basildon'
+													ELSE 'Error'
+														End as [Office]
+										  ,'Private Sector SME' as [Buiness Unit]
+										  ,b.HierarchyName
+									  FROM [base].[RAW_ZDSVERT] a
+									  left join [mi].[HierarchyDataFinal] b
+											 on a.Equipment = b.Equipment
+									  where Sales_District = 4024
+											/*and sales_group in (409,411)*/
+											and case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end in ('CM','CO','CB','SS','IP','NR','IG','RM','WC','EC','E','SE','SW','W','NW','N','E','TN','ME','CT','DA','BR')
+								) a
+							group by 
+								Short_Postcode
+								,HierarchyName
+						) a
+					where [number of devices] = 4
+					group by Short_Postcode
+				) d
+		on a.Short_Postcode = d.Short_Postcode
+		LEFT JOIN (
+					SELECT
+						a.Short_Postcode
+						,count(a.Short_Postcode) as [5+ Devices]
+					FROM (
+							SELECT 
+								Short_Postcode
+								,HierarchyName
+								,count(HierarchyName) as [number of devices]
+							from (
+									SELECT 
+										  [Contract_Start]
+										  ,[Contract_Val_Period]
+										  ,[Contract_Type]
+										  ,a.[Equipment]
+										  ,[Serial_Number]
+										  ,[Equipment_Description]
+										  ,[Street]
+										  ,[City]
+										  ,[Postal_Code]
+										  ,case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end as Short_Postcode
+										  ,CASE WHEN [Sales_Group] = 409 THEN 'London'
+												WHEN [Sales_Group] = 411 THEN 'Basildon'
+													ELSE 'Error'
+														End as [Office]
+										  ,'Private Sector SME' as [Buiness Unit]
+										  ,b.HierarchyName
+									  FROM [base].[RAW_ZDSVERT] a
+									  left join [mi].[HierarchyDataFinal] b
+											 on a.Equipment = b.Equipment
+									  where Sales_District = 4024
+											/*and sales_group in (409,411)*/
+											and case when isnumeric(right(left([Postal_Code],2),1)) = 1 THEN LEFT([Postal_Code],1) else left([Postal_Code],2) end in ('CM','CO','CB','SS','IP','NR','IG','RM','WC','EC','E','SE','SW','W','NW','N','E','TN','ME','CT','DA','BR')
+								) a
+							group by 
+								Short_Postcode
+								,HierarchyName
+						) a
+					where [number of devices] >= 5
+					group by Short_Postcode
+				) e
+		on a.Short_Postcode = e.Short_Postcode
+	) a

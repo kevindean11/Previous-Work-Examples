@@ -1,0 +1,848 @@
+/********************************************************************************************************************************
+[fmp].[FDT_PHOENIX_MAIN] - NEW ORDER INSERT
+********************************************************************************************************************************/
+
+select 
+	DATEADD(m, DATEDIFF(m, 0, GETDATE()), 0) as [Month Added]
+	,b.Name_Sold_To as [Customer Name (Sold to)]
+    ,a.[Sales document] as [Sales Order]
+    ,a.[Equipment] as [Equipment]
+	,b.Serial_Number as [Serial Number]
+	,a.[Main Material] as [Main Material]
+	,b.Name_Bill_To as [Name Bill To]
+	,b.Postal_Code as [Postcode]
+	,c.URN as [URN Number] --Need to discuss with Stu process for ongoing maintenance of lookup table
+    ,cast(a.[Document Date] as date) as [Document Date]
+	,a.[Framework Partner] as [Framework Partner]
+	,a.[Leasing Type] as [Leasing Type]
+	,'TBC' as [Business Type] --To be Completed
+	,CASE WHEN a.[Leasing Type] = 'Sale to Customer' THEN 'OWNED' ELSE 'LEASED' END as [MISO Type]
+    ,convert(date,Contract_Start,103) as [Contract Start]
+    ,dateadd(month,cast([Contract_Val_Period] as INT),convert(date,Contract_Start,103)) as [Calculated Contract End]
+    ,NULL as [Phoenix End Date]
+	,case when b.Rental_Assignment is null then 0 else b.Rental_Assignment end + case when b.Rental_Flat_Rate is null then 0 else b.Rental_Flat_Rate end [Rental]
+    ,cast(contract_val_period as INT) as [Contract Term]
+    ,CASE WHEN a.[Leasing type] = 'Sale to Customer' THEN [Total Revenue] else (case when b.Rental_Assignment is null then 0 else b.Rental_Assignment end + case when b.Rental_Flat_Rate is null then 0 else b.Rental_Flat_Rate end) * cast(Contract_Val_Period as int) end as [Committed Value]
+    ,case when Counter_1_CL_Price is null then 0 else cast(replace(Counter_1_CL_Price,',','.') as decimal(10,5)) end as [Click Price 1]
+    ,case when Counter_2_CL_Price is null then 0 else cast(replace(Counter_2_CL_Price,',','.') as decimal(10,5)) end as [Click Price 2]
+    ,case when Counter_3_CL_Price is null then 0 else cast(replace(Counter_3_CL_Price,',','.') as decimal(10,5)) end as [Click Price 3]
+    ,case when Counter_4_CL_Price is null then 0 else cast(replace(Counter_4_CL_Price,',','.') as decimal(10,5)) end as [Click Price 4]
+    ,case when Asset_Class is null then '' else Asset_Class end as [Class]
+    ,b.Rental_Assignment as [Rental Assignment]
+    ,b.Rental_Flat_Rate as [Rental Flat Rate]
+    ,NULL as [Service Flat Rate]  --To be completed
+	,NULL as [TCO Linked Equipment Number] --To be completed
+	,NULL as [Match: Vert: Framework]
+	,NULL as [Match: Vert: Click Price 1]
+	,NULL as [Match: Vert: Click Price 2]
+	,NULL as [Match: Vert: Click Price 3]
+	,NULL as [Match: Vert: Click Price 4]
+	,NULL as [Match: Vert: Contract Term]
+	,NULL as [Match: Vert: Class]
+	,NULL as [Match: Vert: Rental Assignment]
+	,NULL as [Match: Vert: Rental Flat Rate]
+	,NULL as [Match: Vert: Service Flat Rate]
+	,NULL as [Match: Vert: Leasing Type]
+	,NULL as [Match: Onbase: Framework]
+	,NULL as [Match: Onbase: Click Price 1]
+	,NULL as [Match: Onbase: Click Price 2]
+	,NULL as [Match: Onbase: Click Price 3]
+	,NULL as [Match: Onbase: Click Price 4]
+	,NULL as [Match: Onbase: Contract Term]
+	,NULL as [Match: Onbase: Class]
+	,NULL as [Match: Onbase: Rental Assignment]
+	,NULL as [Match: Onbase: Rental Flat Rate]
+	,NULL as [Match: Onbase: Service Flat Rate]
+	,NULL as [Match: Onbase: Leasing Type]
+    ,'On' as [On / Off]
+    ,'Active' as [Active / Closed]
+    ,'Matrix 1' as [Location]
+    ,'New' as [Reporting Status]
+	into #NEWENTRIES
+from base.commissions_ob a
+left join base.RAW_ZDSVERT b
+	on a.equipment = b.equipment
+left join fmp.MISO_URN_LIST c
+	on b.Name_Sold_To = c.[customer organisation] and b.postal_code = c.PostCode
+left join [fmp].[FDT_PHOENIX_MAIN] d
+	on a.Equipment = d.Equipment and a.[Document Date] = d.[Document Date]
+Where 
+	a.Equipment not like '#'
+	and a.[Framework Partner] in ('FMP-OGC', 'FMP-GPS', 'FMP-GPS3', 'FMP-RM3781', 'FMP-3781L3')/*expand to include all frameworks or just public sector*/
+	and a.[Document Date] between '2019-01-01' and '2019-01-31'
+	and Contract_Start is not null
+	and d.Equipment is null
+
+
+INSERT INTO [fmp].[FDT_PHOENIX_MAIN] 
+    (
+	[Month Added]
+	,[Customer Name (Sold To)]
+	,[Sales Order] 
+	,[Equipment]
+	,[Serial Number]
+	,[Main Material]
+	,[Name Bill To] 
+	,[Postcode] 
+	,[URN Number]
+	,[Document Date]
+	,[Framework Partner] 
+	,[Leasing Type]
+	,[Business Type]
+	,[MISO Type] 
+	,[Contract Start]
+	,[Calculated Contract End] 
+	--,[Phoenix End Date] 
+	,[Rental] 
+	,[Contract Term] 
+	,[Committed Value] 
+	,[Click Price 1]
+	,[Click Price 2]
+	,[Click Price 3]
+	,[Click Price 4]
+	,[Class] 
+	,[Rental Assignment]
+	,[Rental Flat Rate]
+	,[Service Flat Rate]
+	,[TCO Linked Equipment Number]
+	,[Match: Vert: Framework]
+	,[Match: Vert: Click Price 1] 
+	,[Match: Vert: Click Price 2] 
+	,[Match: Vert: Click Price 3] 
+	,[Match: Vert: Click Price 4] 
+	,[Match: Vert: Contract Term] 
+	,[Match: Vert: Class] 
+	,[Match: Vert: Rental Assignment] 
+	,[Match: Vert: Rental Flat Rate] 
+	,[Match: Vert: Service Flat Rate] 
+	,[Match: Vert: Leasing Type] 
+	,[Match: Onbase: Framework] 
+	,[Match: Onbase: Click Price 1] 
+	,[Match: Onbase: Click Price 2] 
+	,[Match: Onbase: Click Price 3] 
+	,[Match: Onbase: Click Price 4] 
+	,[Match: Onbase: Contract Term] 
+	,[Match: Onbase: Class] 
+	,[Match: Onbase: Rental Assignment] 
+	,[Match: Onbase: Rental Flat Rate] 
+	,[Match: Onbase: Service Flat Rate] 
+	,[Match: Onbase: Leasing Type] 
+	,[On / Off] 
+	,[Active / Closed] 
+	,[Location] 
+	,[Reporting Status]
+	)
+
+SELECT
+	[Month Added]
+	,[Customer Name (Sold to)]
+    ,[Sales Order]
+    ,[Equipment]
+	,[Serial Number]
+	,[Main Material]
+	,[Name Bill To]
+	,[Postcode]
+	,[URN Number] --Need to discuss with Stu process for ongoing maintenance of lookup table
+    ,[Document Date]
+	,[Framework Partner]
+	,[Leasing Type]
+	,[Business Type] --To be Completed
+	,[MISO Type]
+    ,[Contract Start]
+    ,[Calculated Contract End]
+    --,[Phoenix End Date]
+	,[Rental]
+    ,[Contract Term]
+    ,[Committed Value]
+    ,[Click Price 1]
+    ,[Click Price 2]
+    ,[Click Price 3]
+    ,[Click Price 4]
+    ,[Class]
+    ,[Rental Assignment]
+    ,[Rental Flat Rate]
+    ,[Service Flat Rate]  --To be completed
+	,[TCO Linked Equipment Number] --To be completed
+	,[Match: Vert: Framework]
+	,[Match: Vert: Click Price 1]
+	,[Match: Vert: Click Price 2]
+	,[Match: Vert: Click Price 3]
+	,[Match: Vert: Click Price 4]
+	,[Match: Vert: Contract Term]
+	,[Match: Vert: Class]
+	,[Match: Vert: Rental Assignment]
+	,[Match: Vert: Rental Flat Rate]
+	,[Match: Vert: Service Flat Rate]
+	,[Match: Vert: Leasing Type]
+	,[Match: Onbase: Framework]
+	,[Match: Onbase: Click Price 1]
+	,[Match: Onbase: Click Price 2]
+	,[Match: Onbase: Click Price 3]
+	,[Match: Onbase: Click Price 4]
+	,[Match: Onbase: Contract Term]
+	,[Match: Onbase: Class]
+	,[Match: Onbase: Rental Assignment]
+	,[Match: Onbase: Rental Flat Rate]
+	,[Match: Onbase: Service Flat Rate]
+	,[Match: Onbase: Leasing Type]
+    ,[On / Off]
+    ,[Active / Closed]
+    ,[Location]
+    ,[Reporting Status]
+FROM #NEWENTRIES
+
+--select * from #NEWENTRIES
+
+/********************************************************************************************************************************
+[fmp].[PHOENIX_EXCLUSIONS] - ORDERS EXCLUDED DUE TO NOT EXISTING ON VERT
+********************************************************************************************************************************/
+
+DELETE FROM [fmp].[PHOENIX_EXCLUSIONS] WHERE CAST([Equipment] as NVARCHAR(MAX))+CAST([Document Date] as NVARCHAR(MAX)) in (SELECT DISTINCT CAST([Equipment] as NVARCHAR(MAX))+CAST([Document Date] as NVARCHAR(MAX)) FROM [fmp].[FDT_PHOENIX_MAIN])
+
+select 
+	cast(GETDATE() as DATE) as [Date Added]
+	,a.[customer name] as [Customer Name (Sold to)]
+    ,a.[Sales document] as [Sales Order]
+	,a.[Document Date]
+    ,a.[Equipment] as [Equipment]
+	,a.[Main Material] as [Main Material]
+	,a.[Framework Partner] as [Framework Partner]
+	,a.[Leasing Type] as [Leasing Type]
+from base.commissions_ob a
+left join base.RAW_ZDSVERT b
+	on a.equipment = b.equipment
+left join fmp.MISO_URN_LIST c
+	on b.Name_Sold_To = c.[customer organisation] and b.postal_code = c.PostCode
+left join [fmp].[FDT_PHOENIX_MAIN] d
+	on a.Equipment = d.Equipment and a.[Document Date] = d.[Document Date]
+Where 
+	a.Equipment not like '#'
+	and a.[Framework Partner] in ('FMP-OGC', 'FMP-GPS', 'FMP-GPS3', 'FMP-RM3781', 'FMP-3781L3')/*expand to include all frameworks or just public sector*/
+	and a.[Document Date] between '2019-01-01' and '2019-01-31'
+	and Contract_Start is null
+	and d.Equipment is null
+
+/********************************************************************************************************************************
+*********************************************************************************************************************************
+UPDATES FOR NEW ENTRIES INTO UPDATE LOG - [fmp].[FDT_PHOENIX_UPDATE_LOG]
+*********************************************************************************************************************************
+********************************************************************************************************************************/
+
+
+/********************************************************************************************************************************
+Month Added
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Month Added' as [Field]
+	,'' as [Old Value]
+	,b.[Month Added] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+ID
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'ID' as [Field]
+	,'' as [Old Value]
+	,b.[ID] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Customer Name (Sold To)
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Customer Name (Sold To)' as [Field]
+	,'' as [Old Value]
+	,b.[Customer Name (Sold To)] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+
+/********************************************************************************************************************************
+Sales Order
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Sales Order' as [Field]
+	,'' as [Old Value]
+	,b.[Sales Order] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Equipment
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Equipment' as [Field]
+	,'' as [Old Value]
+	,b.[Equipment] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Serial Number
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Serial Number' as [Field]
+	,'' as [Old Value]
+	,b.[Serial Number] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Main Material
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Main Material' as [Field]
+	,'' as [Old Value]
+	,b.[Main Material] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+
+/********************************************************************************************************************************
+Name Bill To
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Name Bill To' as [Field]
+	,'' as [Old Value]
+	,b.[Name Bill To] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Postcode
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Postcode' as [Field]
+	,'' as [Old Value]
+	,b.[Postcode] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+URN Number
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'URN Number' as [Field]
+	,'' as [Old Value]
+	,b.[URN Number] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+where b.[URN Number] is not null
+
+/********************************************************************************************************************************
+Document Date
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Document Date' as [Field]
+	,'' as [Old Value]
+	,b.[Document Date] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Framework Partner
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Framework Partner' as [Field]
+	,'' as [Old Value]
+	,b.[Framework Partner] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Leasing Type
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Leasing Type' as [Field]
+	,'' as [Old Value]
+	,b.[Leasing Type] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date] 
+
+/********************************************************************************************************************************
+Business Type
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Business Type' as [Field]
+	,'' as [Old Value]
+	,b.[Business Type] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+MISO Type
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'MISO Type' as [Field]
+	,'' as [Old Value]
+	,b.[MISO Type] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Contract Start
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Contract Start' as [Field]
+	,'' as [Old Value]
+	,b.[Contract Start] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Calculated Contract End
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Calculated Contract End' as [Field]
+	,'' as [Old Value]
+	,b.[Calculated Contract End] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Phoenix End Date
+********************************************************************************************************************************/
+
+--insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+--select
+--	cast(getdate() as date) as [Date]
+--	,b.ID as [ID]
+--	,b.Equipment as [Equipment]
+--	,'Phoenix End Date' as [Field]
+--	,'' as [Old Value]
+--	,b.[Phoenix End Date] as [New Value]
+--	,'Document Date' as [Comments]
+--from dbo.newentries a
+--left join [fmp].[FDT_PHOENIX_MAIN] b
+--	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Rental
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Rental' as [Field]
+	,'' as [Old Value]
+	,b.[Rental] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Contract Term
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Contract Term' as [Field]
+	,'' as [Old Value]
+	,b.[Contract Term] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Committed Value
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Committed Value' as [Field]
+	,'' as [Old Value]
+	,b.[Committed Value] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Click Price 1
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Click Price 1' as [Field]
+	,'' as [Old Value]
+	,b.[Click Price 1] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Click Price 2
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Click Price 2' as [Field]
+	,'' as [Old Value]
+	,b.[Click Price 2] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Click Price 3
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Click Price 3' as [Field]
+	,'' as [Old Value]
+	,b.[Click Price 3] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Click Price 4
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Click Price 4' as [Field]
+	,'' as [Old Value]
+	,b.[Click Price 4] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Class
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Class' as [Field]
+	,'' as [Old Value]
+	,b.[Class] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Rental Assignment
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Rental Assignment' as [Field]
+	,'' as [Old Value]
+	,b.[Rental Assignment] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Rental Flat Rate
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Rental Flat Rate' as [Field]
+	,'' as [Old Value]
+	,b.[Rental Flat Rate] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Service Flat Rate
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Service Flat Rate' as [Field]
+	,'' as [Old Value]
+	,b.[Service Flat Rate] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+where b.[Service Flat Rate] is not null
+
+/********************************************************************************************************************************
+TCO Linked Equipment Number
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'TCO Linked Equipment Number' as [Field]
+	,'' as [Old Value]
+	,b.[TCO Linked Equipment Number] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+where b.[TCO Linked Equipment Number] is not null
+
+/********************************************************************************************************************************
+On / Off
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'On / Off' as [Field]
+	,'' as [Old Value]
+	,b.[On / Off] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Active / Closed
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Active / Closed' as [Field]
+	,'' as [Old Value]
+	,b.[Active / Closed] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Location
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Location' as [Field]
+	,'' as [Old Value]
+	,b.[Location] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] = b.[Document Date]
+
+/********************************************************************************************************************************
+Reporting Status
+********************************************************************************************************************************/
+
+insert into [fmp].[FDT_PHOENIX_UPDATE_LOG]
+
+select
+	cast(getdate() as date) as [Date]
+	,b.ID as [ID]
+	,b.Equipment as [Equipment]
+	,'Reporting Status' as [Field]
+	,'' as [Old Value]
+	,b.[Reporting Status] as [New Value]
+	,'New Entry' as [Comments]
+from #NEWENTRIES a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.Equipment = b.Equipment and a.[Document Date] 

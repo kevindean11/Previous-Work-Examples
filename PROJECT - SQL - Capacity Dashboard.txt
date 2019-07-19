@@ -1,0 +1,322 @@
+	--------------------------------------------------------------------------------------------------------------------------------------------
+	--CREATION OF REGULAR SERVICE REQUIREMENTS (NOT INSTALLS)
+	--------------------------------------------------------------------------------------------------------------------------------------------
+select
+	WeekMonth
+	,DayNumber
+	,Service_District
+	,Model_Type
+	,round((sum(All_Visits_Minus_Installs) / sum(Number_Of_Years)) + (sum(All_Visits_Minus_Installs) / sum(Number_Of_Years)) * case when b.Adjustment is null then 0 else b.Adjustment end,2) All_Visits_Minus_Installs 
+	,round((sum(ResponseHours) / sum(Number_Of_Years)) + (sum(ResponseHours) / sum(Number_Of_Years)) * case when b.Adjustment is null then 0 else b.adjustment end, 2) ResponseHours
+	,round((sum(AvgDowntimePerCall) / sum(Number_Of_Years)) + (sum(AvgDowntimePerCall) / sum(Number_Of_Years)) * case when b.Adjustment is null then 0 else b.Adjustment end,2) AvgDowntimePerCall	
+	--,b.Adjustment
+	--,Number_Of_Years
+	into #SERVICE
+from		(				
+				select
+					WeekMonth
+					,DayNumber
+					,yearnumber
+					,Service_District
+					,Model_Type
+					,All_Visits_Minus_Installs  
+					,ResponseHours
+					,AvgDowntimePerCall
+					,cast(COUNT(*)  over (partition by yearnumber,WeekMonth, DayNumber,Model_Type,Service_District) as float)  as Number_Of_Years
+					,COUNT(*)  over (partition by yearnumber, WeekMonth, DayNumber,Model_Type,Service_District) fullyear
+				from 
+						(
+						select
+							DATEPART(MONTH, CONVERT(datetime, a.[Notif_Creation_Date], 103)) as WeekMonth
+							,DATEPART(DAY, CONVERT(datetime, a.[Notif_Creation_Date], 103)) as DayNumber
+							,datepart(year, CONVERT(datetime, a.[Notif_Creation_Date], 103)) as YearNumber
+							,c.[mfd SERVICE DISTRICT] as Service_District
+							,d.Model_Type
+							,sum(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1.0 else cast( [Number_of_All_Visits] as float) end) as All_Visits_Minus_Installs   
+							,sum((CASE WHEN d.Model_Type = 'Ancillary' THEN 1 WHEN d.Model_Type = 'KIP' THEN 4.5 WHEN d.Model_Type = 'Epson' THEN 4.5 ELSE  cast([Labour_Hours_for_All_Visits] as float) END  + CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1.0 else cast( [Hours_for_Travel] as float) END ))  as ResponseHours
+							,sum(((CASE WHEN d.Model_Type = 'Ancillary' THEN 1 WHEN d.Model_Type = 'KIP' THEN 4.5 WHEN d.Model_Type = 'Epson' THEN 4.5 ELSE  cast([Labour_Hours_for_All_Visits] as float) END + CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1.0 else cast( [Hours_for_Travel] as float)end)  / CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1 else cast(case when [Number_of_All_Visits] = 0 then null else [Number_of_All_Visits] end as float) end)) as AvgDowntimePerCall
+							--,datepart(DW,convert(date,Notif_Creation_Date,103))
+							--,Notif_Creation_Date
+						from base.ACC_DRAFT_REPORT as a
+						left join lup.MONTH_YEAR as m on a.Month_Year = m.BW_Month
+						LEFT JOIN (select 
+										[POST]
+										,[mfd service district] 
+								   from [lup].[SERVICE_REGIONS_POSTCODES]
+								   group by 
+									   [POST]
+									   ,[mfd service district]) c
+							on c.[POST] =   LEFT([Post_Code],CASE WHEN CHARINDEX(' ',[Post_Code]) = 0 THEN 1 ELSE CHARINDEX(' ',[Post_Code]) end -1)
+						left join (select
+										material_description
+										,case when Model_Type = 'Printer' then 'MFD' else Model_Type end as Model_Type
+									from lup.model
+									group by
+										material_description
+										,Model_Type) d
+							on a.model = d.material_description
+						where m.Month_Year >= '2010-04-01' and [Notif_Creation_Date] not like '#' 
+							and [Visit_Code] not like '10'
+							and datepart(DW,convert(date,Notif_Creation_Date,103)) <> 1
+							and datepart(DW,convert(date,Notif_Creation_Date,103)) <> 7
+							
+						group by 
+							DATEPART(MONTH, CONVERT(datetime, a.[Notif_Creation_Date], 103))
+							,DATEPART(DAY, CONVERT(datetime, a.[Notif_Creation_Date], 103))
+							,datepart(year, CONVERT(datetime, a.[Notif_Creation_Date], 103))
+							,c.[mfd SERVICE DISTRICT]
+							,d.Model_Type
+						) JM
+						) KD
+left join serv.capacity_adjustments b
+	on kd.Service_District = b.Region and kd.Model_Type = b.[MFD / PPD]
+group by 
+	WeekMonth
+	,DayNumber
+	,Service_District
+	,Model_Type
+	,Adjustment
+	--,Number_Of_Years
+				
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--CREATION OF INSTALL REQUIREMENTS
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		select 
+			CONVERT(date,[deldate customer],103) as [Date]
+			,c.[mfd SERVICE DISTRICT]
+			,d.Model_Type
+			,[Material Description]
+			,Equipment
+			,[D-Transportref]
+			,[To:Postal Code]
+			,AverageLabourHours as TotalLabourHours
+			,AverageHoursForTravel as TotalTravelHours
+			,TotalRequiredHours as TotalRequiredHours
+			into #TM
+		from lup.TRANSPORT_MONITOR a
+			LEFT JOIN (select
+									material_description as Material
+									,case when Model_Type = 'Printer' then 'MFD' else Model_Type end as Model_Type
+							from lup.model
+							group by
+										material_description
+										,Model_Type) d
+			on a.[Material Description] = d.Material
+		left join (select 
+						Model
+						,Model_Type
+						,ROUND(cast(CASE WHEN d.model_type = 'Ancillary' THEN 1 WHEN d.Model_Type = 'KIP' THEN 4.5 WHEN d.Model_Type = 'Epson' THEN 4.5 ELSE  avg(cast([Labour_Hours_for_All_Visits] as float)) END as float),2) as AverageLabourHours
+						,ROUND(cast(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1 else avg(cast([Hours_for_Travel] as float)) END as float),2) as AverageHoursForTravel
+						,ROUND(avg(cast(labour_hours_for_all_visits as float)) + avg(cast(hours_for_travel as float)),2) as TotalRequiredHours
+					from base.ACC_DRAFT_REPORT a
+					LEFT JOIN base.PLACEMENT_DETAILS b
+						on a.Equipment = b.Equipment					
+					LEFT JOIN (select
+											material_description as Material
+											,case when Model_Type = 'Printer' then 'MFD' else Model_Type end as Model_Type
+									from lup.model
+									group by
+											material_description
+											,Model_Type) d
+						on d.Material = a.Model
+					where Visit_Code = '10'
+					group by Model, Model_Type) b
+			on a.[Material Description]  = b.Model
+		LEFT JOIN (select 
+						[POST]
+						,[mfd service district] 
+				   from [lup].[SERVICE_REGIONS_POSTCODES]
+				   group by 
+					   [POST]
+					   ,[mfd service district]) c
+			on c.[POST] =   LEFT([To:Postal Code],CASE WHEN CHARINDEX(' ',[To:Postal Code]) = 0 THEN 1 ELSE CHARINDEX(' ',[To:Postal Code]) end -1)
+				
+		where [Deliverytype (TM)] = 'D' 
+			  and [Material Description] in (select distinct Model from base.ACC_DRAFT_REPORT where Visit_Code = '10' ) 
+			  and [Deldate customer] not like '00.00.0000'
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+--CREATION OF BACKORDER TABLE
+-----------------------------------------------------------------------------------------------------------------------------
+		select 
+			CONVERT(date,[REQUESTED DELIV#DATE],103) as [Date]
+			,c.[mfd SERVICE DISTRICT]
+			,d.Model_Type
+			,[Material Description]
+			,Equipment
+			,[D-Transportref]
+			,[To:Postal Code]
+			,AverageLabourHours as TotalLabourHoursBO
+			,AverageHoursForTravel as TotalTravelHoursBO
+			,TotalRequiredHours as TotalRequiredHoursBO
+			into #BO
+		from [log].BACKORDER_ZTM a
+			LEFT JOIN (select
+									material_description as Material
+									,case when Model_Type = 'Printer' then 'MFD' else Model_Type end as Model_Type
+							from lup.model
+							group by
+										material_description
+										,Model_Type) d
+			on a.[Material Description] = d.Material
+		left join (select 
+						Model
+						,Model_Type
+						,ROUND(cast(CASE WHEN d.model_type = 'Ancillary' THEN 1 WHEN d.Model_Type = 'KIP' THEN 4.5 WHEN d.Model_Type = 'Epson' THEN 4.5 ELSE  avg(cast([Labour_Hours_for_All_Visits] as float)) END as float),2) as AverageLabourHours
+						,ROUND(cast(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1 else avg(cast([Hours_for_Travel] as float)) END as float),2) as AverageHoursForTravel
+						,ROUND(avg(cast(labour_hours_for_all_visits as float)) + avg(cast(hours_for_travel as float)),2) as TotalRequiredHours
+					from base.ACC_DRAFT_REPORT a
+					LEFT JOIN base.PLACEMENT_DETAILS b
+						on a.Equipment = b.Equipment					
+					LEFT JOIN (select
+											material_description as Material
+											,case when Model_Type = 'Printer' then 'MFD' else Model_Type end as Model_Type
+									from lup.model
+									group by
+											material_description
+											,Model_Type) d
+						on d.Material = a.Model
+					where Visit_Code = '10'
+					group by Model, Model_Type) b
+			on a.[Material Description]  = b.Model
+		LEFT JOIN (select 
+						[POST]
+						,[mfd service district] 
+				   from [lup].[SERVICE_REGIONS_POSTCODES]
+				   group by 
+					   [POST]
+					   ,[mfd service district]) c
+			on c.[POST] =   LEFT([To:Postal Code],CASE WHEN CHARINDEX(' ',[To:Postal Code]) = 0 THEN 1 ELSE CHARINDEX(' ',[To:Postal Code]) end -1)
+				
+		where [From:Postal Code] = 'SS14 3AR' 
+			  and [Material Description] in (select distinct Model from base.ACC_DRAFT_REPORT where Visit_Code = '10' ) 
+			  and [Requested deliv#date] not like '00.00.0000'
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--CREATION OF FINAL TABLE
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+DELETE FROM serv.FDT_INSTALL_CAPACITY
+INSERT INTO serv.FDT_INSTALL_CAPACITY
+
+select
+	[Date]
+	,Service_District
+	,Model_Type 
+	,Predicted_Requirement_Defects
+	,Predicted_Requirement_Installs 
+	,Predicted_Requirement_Backorders
+	,Predicted_Requirement_Defects + Predicted_Requirement_Installs + Predicted_Requirement_Backorders AS Predicted_Requirement_Total
+	,(Predicted_Requirement_Defects + Predicted_Requirement_Installs + Predicted_Requirement_Backorders) / 7.5  AS Predicted_Requirement_Headcount
+	,[Available Hours]
+	,MAX_HOURS
+	FROM (
+		select 
+			CAST(a.[date] as DATE) as [Date]
+			,Service_District
+			,b.Model_Type 
+			,round(case when ResponseHours is null then 0 else ResponseHours end,0) as Predicted_Requirement_Defects
+			,round(case when c.TotalRequiredHours is null then 0 else c.TotalRequiredHours end,0) as Predicted_Requirement_Installs
+			,round(case when e.TotalRequiredHoursbo is null then 0 else e.TotalRequiredHoursbo end,0) as Predicted_Requirement_Backorders
+			,d.[Available Hours]
+			,f.MAX_HOURS
+		from lup.dates a
+		left join
+				(select
+					WeekMonth
+					,DayNumber
+					,Service_District
+					,Model_type
+					,All_Visits_Minus_Installs as All_Visits_Minus_Installs
+					,ResponseHours as ResponseHours
+					,AvgDowntimePerCall as AvgDowntimePerCall
+				from #SERVICE) b
+			on a.[week month] = b.WeekMonth and a.[Day Number] = b.DayNumber
+		left join 	(SELECT 
+						[DATE]
+						,MODEL_TYPE
+						,[MFD SERVICE DISTRICT]
+						,SUM(TOTALREQUIREDHOURS) AS TOTALREQUIREDHOURS
+					FROM #TM
+					GROUP BY 
+						 [DATE]
+						,MODEL_TYPE
+						,[MFD SERVICE DISTRICT]
+					) c
+			on a.[date] = c.[Date] and b.Service_District = c.[mfd SERVICE DISTRICT] and b.Model_Type = c.Model_Type
+		left join (SELECT 
+						[DATE]
+						,MODEL_TYPE
+						,[MFD SERVICE DISTRICT]
+						,SUM(TOTALREQUIREDHOURSBO) AS TOTALREQUIREDHOURSBO
+					FROM #BO
+					GROUP BY 
+						 [DATE]
+						,MODEL_TYPE
+						,[MFD SERVICE DISTRICT]
+					) E
+			on a.[date] = E.[Date] and b.Service_District = E.[mfd SERVICE DISTRICT] and b.Model_Type = E.Model_Type
+		left join [serv].[Install_Capactiy_Calendar_Data] d
+			on Service_District = branch and a.[Date] = d.[Date] and ppd = b.Model_Type
+		left join (select branch, PPD, MAX([Available Hours]) MAX_HOURS from [serv].[Install_Capactiy_Calendar_Data] group by branch, PPD) f
+			on Service_District = f.Branch and f.ppd = b.Model_Type
+		where a.[date] >= '2018-01-01' and a.[date] <= '2019-12-31'
+		) K
+where [Available Hours] is not null
+order by [date] 
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+--MODELS TO BE ADDED TO LUP.MODEL
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+SELECT distinct model from (
+				select
+					WeekMonth
+					,DayNumber
+					,Service_District
+					,Model
+					,Model_Type
+					,All_Visits_Minus_Installs  
+					,ResponseHours
+					,AvgDowntimePerCall
+					,COUNT(*) over (partition by WeekMonth, DayNumber,Model_Type,Service_District) as Number_Of_Years
+				from 
+						(
+						select 
+							DATEPART(MONTH, CONVERT(datetime, a.[Notif_Closing_Date], 103)) as WeekMonth
+							,DATEPART(DAY, CONVERT(datetime, a.[Notif_Closing_Date], 103)) as DayNumber
+							,c.[mfd SERVICE DISTRICT] as Service_District
+							,d.Model_Type
+							,a.Model
+							,sum(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1.0 else cast( [Number_of_All_Visits] as float) end ) as All_Visits_Minus_Installs   
+							,(sum(CASE WHEN d.Model_Type = 'Ancillary' THEN 1 WHEN d.Model_Type = 'KIP' THEN 4.5 WHEN d.Model_Type = 'Epson' THEN 4.5 ELSE  cast([Labour_Hours_for_All_Visits] as float) END ) + sum(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1.0 else cast( [Hours_for_Travel] as float) END ) ) as ResponseHours
+							,((sum(CASE WHEN d.Model_Type = 'Ancillary' THEN 1 WHEN d.Model_Type = 'KIP' THEN 4.5 WHEN d.Model_Type = 'Epson' THEN 4.5 ELSE  cast([Labour_Hours_for_All_Visits] as float) END) + sum(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1.0 else cast( [Hours_for_Travel] as float)end) ) / sum(CASE WHEN d.[Model_Type] in ('Ancillary','KIP','Epson') THEN 1 else cast([Number_of_All_Visits] as float) end)) as AvgDowntimePerCall
+						from base.ACC_DRAFT_REPORT as a
+						left join lup.MONTH_YEAR as m on a.Month_Year = m.BW_Month
+						LEFT JOIN (select 
+										[POST]
+										,[mfd service district] 
+								   from [lup].[SERVICE_REGIONS_POSTCODES]
+								   group by 
+									   [POST]
+									   ,[mfd service district]) c
+							on c.[POST] =   LEFT([Post_Code],CASE WHEN CHARINDEX(' ',[Post_Code]) = 0 THEN 1 ELSE CHARINDEX(' ',[Post_Code]) end -1)
+						left join (select
+										material_description
+										,case when Model_Type = 'Printer' then 'MFD' else Model_Type end as Model_Type
+									from lup.model
+									group by
+										material_description
+										,Model_Type) d
+							on a.model = d.material_description
+						where m.Month_Year >= '2017-04-01' and Notif_Closing_Date not like '#' and [Visit_Code] not like '10'
+						group by 
+							c.[mfd SERVICE DISTRICT]
+							,d.Model_Type
+							,a.Model
+							,DATEPART(MONTH, CONVERT(datetime, a.[Notif_Closing_Date], 103))
+							,DATEPART(DAY, CONVERT(datetime, a.[Notif_Closing_Date], 103)) 
+						) JM) k
+			WHERE model_type is null

@@ -1,0 +1,287 @@
+/******************************************************************************************************************
+VERT FRAMEWORK PARTNER CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_FMP
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_FMP
+
+select 
+	id
+	,[framework partner]
+	,b.framework_partner
+	,case when a.[framework partner] = b.[framework_partner] then 'Yes' else 'No' end as [Framework Partner Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Framework'
+	,CASE WHEN b.[Match: Vert: Framework] is null then '' else b.[Match: Vert: Framework] end as [Old Value]
+	,[Framework Partner Check] as [New Value]
+	,'Framework partner check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_FMP a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[Framework Partner Check] not like case when b.[Match: Vert: Framework] is null then 'not' else b.[Match: Vert: Framework] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Framework] = fmp.PHOENIX_MATCH_CHECK_VERT_FMP.[Framework Partner Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_FMP
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_FMP.id
+
+
+/******************************************************************************************************************
+VERT CLICK PRICE 1 CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_1
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_1
+
+select 
+	id
+	,[Click Price 1]
+	,b.Counter_1_CL_Price
+	,case when a.[Click Price 1] = case when Counter_1_CL_Price is null then 0 else cast(replace(Counter_1_CL_Price,',','.') as decimal(10,5)) end then 'Yes' else 'No' end as [Click Price 1 Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Click Price 1'
+	,CASE WHEN b.[Match: Vert: Click Price 1] is null then '' else b.[Match: Vert: Click Price 1] end as [Old Value]
+	,[click Price 1 Check] as [New Value]
+	,'Click price 1 check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_1 a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[click Price 1 Check] not like case when b.[Match: Vert: Click Price 1] is null then 'not' else b.[Match: Vert: Click Price 1] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Click Price 1] = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_1.[click price 1 Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_1
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_1.id
+
+/******************************************************************************************************************
+VERT CLICK PRICE 2 CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_2
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_2
+
+select 
+	id
+	,[Click Price 2]
+	,b.Counter_2_CL_Price
+	,case when a.[Click Price 2] = case when Counter_2_CL_Price is null then 0 else cast(replace(Counter_2_CL_Price,',','.') as decimal(10,5)) end then 'Yes' else 'No' end as [Click Price 2 Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Click Price 2'
+	,CASE WHEN b.[Match: Vert: Click Price 2] is null then '' else b.[Match: Vert: Click Price 2] end as [Old Value]
+	,[click Price 2 Check] as [New Value]
+	,'Click price 2 check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_2 a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[click Price 2 Check] not like case when b.[Match: Vert: Click Price 2] is null then 'not' else b.[Match: Vert: Click Price 2] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Click Price 2] = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_2.[click price 2 Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_2
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_2.id
+
+/******************************************************************************************************************
+VERT CLICK PRICE 3 CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_3
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_3
+
+select 
+	id
+	,[Click Price 3]
+	,b.Counter_3_CL_Price
+	,case when a.[Click Price 3] = case when Counter_3_CL_Price is null then 0 else cast(replace(Counter_3_CL_Price,',','.') as decimal(10,5)) end then 'Yes' else 'No' end as [Click Price 3 Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Click Price 3'
+	,CASE WHEN b.[Match: Vert: Click Price 3] is null then '' else b.[Match: Vert: Click Price 3] end as [Old Value]
+	,[click Price 3 Check] as [New Value]
+	,'Click price 3 check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_3 a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[click Price 3 Check] not like case when b.[Match: Vert: Click Price 3] is null then 'not' else b.[Match: Vert: Click Price 3] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Click Price 3] = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_3.[click price 3 Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_3
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_3.id
+
+/******************************************************************************************************************
+VERT CLICK PRICE 4 CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_4
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_4
+
+select 
+	id
+	,[Click Price 4]
+	,b.Counter_4_CL_Price
+	,case when a.[Click Price 4] = case when Counter_4_CL_Price is null then 0 else cast(replace(Counter_4_CL_Price,',','.') as decimal(10,5)) end then 'Yes' else 'No' end as [Click Price 4 Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Click Price 4'
+	,CASE WHEN b.[Match: Vert: Click Price 4] is null then '' else b.[Match: Vert: Click Price 4] end as [Old Value]
+	,[click Price 4 Check] as [New Value]
+	,'Click price 4 check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_4 a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[click Price 4 Check] not like case when b.[Match: Vert: Click Price 4] is null then 'not' else b.[Match: Vert: Click Price 4] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Click Price 4] = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_4.[click price 4 Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_4
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_CLICK_PRICE_4.id
+
+/******************************************************************************************************************
+CONTRACT TERM  CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_CONTRACT_TERM
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_CONTRACT_TERM
+
+select 
+	a.id
+	,[Contract Term]
+	,convert(int,b.Contract_Val_Period) AS [CONTRACT_VAL_PERIOD]
+	,case when a.[Contract Term] = case when b.Contract_Val_Period is null then 0 else CONVERT(int,b.Contract_Val_Period) end then 'Yes' else 'No' end as [Contract Term Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Contract Term'
+	,CASE WHEN b.[Match: Vert: Contract Term] is null then '' else b.[Match: Vert: Contract Term] end as [Old Value]
+	,[Contract Term Check] as [New Value]
+	,'Contract term check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_CONTRACT_TERM a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[Contract Term Check] not like case when b.[Match: Vert: Contract Term] is null then 'not' else b.[Match: Vert: Contract Term] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Contract Term] = fmp.PHOENIX_MATCH_CHECK_VERT_CONTRACT_TERM.[Contract Term Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_CONTRACT_TERM
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_CONTRACT_TERM.id
+
+/******************************************************************************************************************
+CLASS CHECK
+******************************************************************************************************************/
+
+
+delete from fmp.PHOENIX_MATCH_CHECK_VERT_CLASS
+insert into fmp.PHOENIX_MATCH_CHECK_VERT_CLASS
+
+select 
+	a.id
+	,[Class]
+	,Asset_Class AS [Asset_Class]
+	,case when a.[Class] = case when b.Asset_Class is null then '' else b.Asset_Class end then 'Yes' else 'No' end as [Asset Check]
+from [fmp].[FDT_PHOENIX_MAIN] a
+left join base.raw_zdsvert b
+	on a.equipment = b.equipment
+
+--------------------------------------------------------------------------------------------------------------------
+
+insert into fmp.fdt_phoenix_update_log
+
+select
+	convert(date,getdate()) as [Date] 
+	,a.id
+	,b.equipment
+	,'Match: Vert: Class'
+	,CASE WHEN b.[Match: Vert: Class] is null then '' else b.[Match: Vert: Class] end as [Old Value]
+	,[asset Check] as [New Value]
+	,'Class check against vert'+' '+CAST(convert(date,getdate()) as NVARCHAR(20)) as [Comments]
+from fmp.PHOENIX_MATCH_CHECK_VERT_CLASS a
+left join [fmp].[FDT_PHOENIX_MAIN] b
+	on a.id = b.id
+where a.[Asset Check] not like case when b.[Match: Vert: Class] is null then 'not' else b.[Match: Vert: Class] end
+
+---------------------------------------------------------------------------------------------------------------------
+
+update fmp.FDT_PHOENIX_MAIN
+set [fmp].[FDT_PHOENIX_MAIN].[Match: Vert: Class] = fmp.PHOENIX_MATCH_CHECK_VERT_CLASS.[asset Check]
+from [fmp].[FDT_PHOENIX_MAIN], fmp.PHOENIX_MATCH_CHECK_VERT_CLASS
+where [fmp].[FDT_PHOENIX_MAIN].ID = fmp.PHOENIX_MATCH_CHECK_VERT_CLASS.id
